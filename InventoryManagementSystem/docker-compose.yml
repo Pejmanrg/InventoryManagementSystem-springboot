@@ -1,0 +1,55 @@
+# =====================================================================
+#  Local development stack: PostgreSQL 16 + the API.
+#
+#    docker compose up --build
+#    docker compose down          (keeps data)
+#    docker compose down -v       (deletes data)
+#
+#  The API waits for the database to report healthy before starting, so
+#  Flyway never runs against a database that is still initialising.
+# =====================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: inventory-db
+    environment:
+      POSTGRES_DB: inventorydb
+      POSTGRES_USER: inventory
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-inventory}
+    ports:
+      - "5432:5432"
+    volumes:
+      - inventory-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory -d inventorydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: inventory-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/inventorydb
+      DB_USERNAME: inventory
+      DB_PASSWORD: ${DB_PASSWORD:-inventory}
+      SERVER_PORT: 8080
+      # Development credentials. Override these before exposing the API
+      # anywhere other than your own machine.
+      FIELD_PASSWORD: ${FIELD_PASSWORD:-field123}
+      MANAGER_PASSWORD: ${MANAGER_PASSWORD:-manager123}
+      FINANCE_PASSWORD: ${FINANCE_PASSWORD:-finance123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      # Add ",demo" to seed the Module 2 demonstration data on startup.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  inventory-pgdata:

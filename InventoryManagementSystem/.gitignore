@@ -1,0 +1,17 @@
+/target/
+/.nb-gradle/
+/nbproject/private/
+.DS_Store
+*.log
+
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local environment overrides - never commit credentials
+.env
+application-local.yml

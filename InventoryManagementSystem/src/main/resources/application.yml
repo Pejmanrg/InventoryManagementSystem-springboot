@@ -1,0 +1,110 @@
+spring:
+  application:
+    name: inventory-management-system
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/inventorydb}
+    username: ${DB_USERNAME:inventory}
+    password: ${DB_PASSWORD:inventory}
+    hikari:
+      maximum-pool-size: 10
+      # AuditService.recordDenied() runs in REQUIRES_NEW, so a request can
+      # briefly hold two connections. The pool must never be smaller than 2.
+      minimum-idle: 2
+      connection-timeout: 20000
+
+  jpa:
+    # Off deliberately. With open-in-view enabled, a lazy association can be
+    # loaded while the response is being written, which hides N+1 queries in
+    # the view layer and holds a connection for the whole request. Entities
+    # are mapped to DTOs inside the service transaction instead.
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema. Hibernate must never create or alter it.
+      #
+      # `validate` is the stronger setting and is worth switching to once the
+      # application starts cleanly on your machine: it fails fast when an
+      # entity and its table drift apart. It is not the default here only
+      # because Hibernate's validator is strict about timestamp-with-time-zone
+      # columns across driver versions, and a false failure on first run is a
+      # worse outcome than the drift it would catch. See README section 9.
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+    show-sql: false
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Left false on purpose: an existing database with no flyway_schema_history
+    # is an unknown schema, and silently baselining it would let the
+    # application start against something it does not understand.
+    baseline-on-migrate: false
+
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    # Error bodies come from GlobalExceptionHandler. Never let the container
+    # add exception messages or stack traces to a response.
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    root: INFO
+    com.solarintegrators.inventory: INFO
+    # Uncomment while diagnosing a query problem:
+    # org.hibernate.SQL: DEBUG
+    # org.hibernate.orm.jdbc.bind: TRACE
+
+app:
+  security:
+    # Origins allowed to call the API from a browser - the front-end prototype
+    # served by VS Code Live Server or `python -m http.server`.
+    allowed-origins:
+      - http://localhost:5500
+      - http://127.0.0.1:5500
+      - http://localhost:3000
+
+    # -----------------------------------------------------------------
+    # PHASE 1 DEVELOPMENT ACCOUNTS
+    #
+    # These exist so the API can be run and demonstrated before the
+    # Microsoft Entra ID integration (Phase 3) is built. They are not a
+    # production identity design:
+    #   - override every password with an environment variable outside
+    #     your own machine
+    #   - delete this block entirely once OIDC is in place
+    # Roles match the four actors in the SDD user view.
+    # -----------------------------------------------------------------
+    users:
+      - username: field
+        password: ${FIELD_PASSWORD:field123}
+        role: FIELD
+      - username: manager
+        password: ${MANAGER_PASSWORD:manager123}
+        role: MANAGER
+      - username: finance
+        password: ${FINANCE_PASSWORD:finance123}
+        role: FINANCE
+      - username: admin
+        password: ${ADMIN_PASSWORD:admin123}
+        role: ADMIN
