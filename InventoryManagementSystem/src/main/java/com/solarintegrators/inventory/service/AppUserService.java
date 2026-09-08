@@ -10,6 +10,7 @@ import com.solarintegrators.inventory.model.UserRole;
 import com.solarintegrators.inventory.repository.AppUserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -59,6 +60,21 @@ public class AppUserService {
         return appUserRepository.findAllByOrderByUsernameAsc().stream()
                 .map(UserResponse::from)
                 .toList();
+    }
+
+    /**
+     * Looks an account up by the name it signs in with.
+     *
+     * <p>Returns empty rather than throwing: the only caller is
+     * {@code /api/users/me}, where "no row" is the ordinary case for a
+     * configured break-glass account, not an error.</p>
+     */
+    @Transactional(readOnly = true)
+    public Optional<UserResponse> findByUsername(String username) {
+        if (username == null || username.isBlank()) {
+            return Optional.empty();
+        }
+        return appUserRepository.findByUsernameIgnoreCase(username).map(UserResponse::from);
     }
 
     @Transactional(readOnly = true)

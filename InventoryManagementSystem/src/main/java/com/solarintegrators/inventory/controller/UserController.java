@@ -4,6 +4,7 @@ import com.solarintegrators.inventory.dto.request.CreateUserRequest;
 import com.solarintegrators.inventory.dto.request.ResetPasswordRequest;
 import com.solarintegrators.inventory.dto.request.UpdateUserRequest;
 import com.solarintegrators.inventory.dto.response.UserResponse;
+import com.solarintegrators.inventory.model.UserRole;
 import com.solarintegrators.inventory.service.AppUserService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,6 +51,46 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> listUsers() {
         return appUserService.listUsers();
+    }
+
+    /**
+     * The signed-in account's own profile.
+     *
+     * <p>Authenticated rather than ADMIN-only, and deliberately so: this is how
+     * the interface discovers which role it is running as, and every role needs
+     * that. It returns only the caller's own record, so it discloses nothing the
+     * caller did not already supply to sign in.</p>
+     *
+     * <p>A configured break-glass account has no row in {@code app_users}.
+     * Returning 404 there would make the interface treat a valid sign-in as a
+     * failure, so the role is instead read back from the granted authority and
+     * returned with a null {@code userId} - which is also the marker that the
+     * profile cannot be edited here, because it lives in configuration.</p>
+     *
+     * <p>Mapped before {@code /{userId}} by pattern specificity: a literal
+     * segment outranks a variable one, so {@code me} never reaches the UUID
+     * converter.</p>
+     */
+    @GetMapping("/me")
+    public UserResponse currentUser(Authentication authentication) {
+        String username = authentication.getName();
+        return appUserService.findByUsername(username)
+                .orElseGet(() -> UserResponse.breakGlass(username, roleOf(authentication)));
+    }
+
+    /** Reads the role back out of the granted authorities: ROLE_ADMIN -> ADMIN. */
+    private static UserRole roleOf(Authentication authentication) {
+        for (GrantedAuthority granted : authentication.getAuthorities()) {
+            String authority = granted.getAuthority();
+            if (authority != null && authority.startsWith("ROLE_")) {
+                try {
+                    return UserRole.valueOf(authority.substring("ROLE_".length()));
+                } catch (IllegalArgumentException ignored) {
+                    /* Not one of the four roles - keep looking rather than fail. */
+                }
+            }
+        }
+        return UserRole.FIELD;
     }
 
     @GetMapping("/{userId}")

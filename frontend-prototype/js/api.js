@@ -13,11 +13,12 @@
      audit         AuditController        /api/audit
      reports       computed client-side from live assets / inventory / locations
      admin.lookups locations come from /api/locations
+     admin.users   UserController         /api/users (ADMIN only)
 
    WHAT IS STILL MOCKED - no backend exists for these yet (Phase 2):
      maintenance   work orders   - no MaintenanceController / WorkOrder entity
      reports.maintenanceDue      - depends on work orders
-     admin.users / assignRole / setStatus / integrations / purchaseOrders
+     admin.integrations / purchaseOrders
 
    Mocked functions still read and write the in-browser Store, so those screens
    behave exactly as they did in the prototype. They are marked MOCK below.
@@ -34,29 +35,6 @@
 
   /** Deployed Cloud Run service. Change this one line to point elsewhere. */
   var API_BASE = 'https://inventory-api-173479193959.us-west2.run.app';
-
-  /**
-   * Role shown in the UI for each Phase 1 account.
-   *
-   * The backend has no user-profile endpoint yet, so after a successful sign-in
-   * there is no way to ask the API "what role am I?". These usernames come from
-   * app.security.users in application.yml and their roles are fixed, so the
-   * mapping is exact for them.
-   *
-   * This only decides which menu items and buttons the UI shows. Real
-   * authorization is enforced server-side by @PreAuthorize, so an unknown
-   * username getting the conservative default below can still read what its
-   * role permits and will receive a 403 for anything it may not do.
-   *
-   * Phase 3 note: when Entra ID / OIDC replaces HTTP Basic, the role comes from
-   * a token claim and this map is deleted.
-   */
-  var ROLE_BY_USERNAME = {
-    'field': 'FIELD',
-    'manager': 'MANAGER',
-    'finance': 'FINANCE',
-    'admin': 'ADMIN'
-  };
 
   /** Page size used for screens that render a full list rather than paging. */
   var PAGE_SIZE = 500;
@@ -216,17 +194,11 @@
   /* ================================================================= AUTH */
   /* LIVE. The backend uses HTTP Basic, so "signing in" means proving the
      credential works and then keeping it for subsequent requests. There is no
-     session endpoint and no token to obtain - GET /api/locations is called as
-     a cheap, read-only probe that every role is permitted to make. */
-
-  /** Finds a demo display profile for a role, so the UI can show a name. */
-  function profileForRole(role) {
-    var users = (global.MockData && global.MockData.USERS) || [];
-    for (var i = 0; i < users.length; i++) {
-      if (users[i].role === role) { return users[i]; }
-    }
-    return null;
-  }
+     session endpoint and no token to obtain - GET /api/users/me is called as a
+     cheap probe that every authenticated role may make, and it answers the one
+     question the UI cannot answer for itself: which role am I? Before this
+     endpoint existed the role was guessed from the username, which was only
+     ever correct for the four accounts in application.yml. */
 
   var auth = {
     /**
@@ -258,18 +230,26 @@
         return Promise.reject(new ApiError(400, 'That username or password contains characters the browser cannot encode.'));
       }
 
-      return http('GET', '/api/locations', null, null, 'Basic ' + basic)
-        .then(function () {
-          var role = ROLE_BY_USERNAME[username.toLowerCase()] || 'FIELD';
-          var profile = profileForRole(role) || {};
+      return http('GET', '/api/users/me', null, null, 'Basic ' + basic)
+        .then(function (me) {
+          me = me || {};
+          /* The server is the only authority on role. An unrecognised value
+             falls back to the least-privileged role rather than an empty menu;
+             the server re-checks every action either way, so a wrong guess here
+             can only ever hide something, never permit it. */
+          var role = global.MockData.ROLES[me.role] ? me.role : 'FIELD';
           var session = {
-            userId: profile.userId || username,
-            username: username,
-            name: profile.name || username,
-            email: profile.email || '',
+            userId: me.userId || username,
+            username: me.username || username,
+            name: me.displayName || me.username || username,
+            email: me.email || '',
+            jobTitle: me.jobTitle || '',
             role: role,
-            employeeId: profile.employeeId || null,
-            site: profile.site || '',
+            /* Null for a configured break-glass account: it has no row in
+               app_users, so there is no /api/users/{id} profile to open. */
+            accountId: me.userId || null,
+            employeeId: null,
+            site: '',
             signedInAt: nowIso(),
             basic: basic
           };
@@ -832,41 +812,104 @@
   };
 
   /* ================================================================ ADMIN */
-  /* MOCK except lookups.locations - there is no user, integration or purchase
-     order endpoint in Phase 1. User management is Entra ID's job (Phase 3). */
+  /* Users are LIVE - UserController /api/users, ADMIN only except /me.
+     lookups.locations is LIVE. Integrations and purchase orders remain MOCK:
+     no backend table exists for either in Phase 1. */
+
+  /**
+   * Adds the fields the screens display.
+   *
+   * The API returns an account as it is stored; `name`, `roleName`, `status`
+   * and `lastSignIn` are presentation of that same data. Deriving them once
+   * here keeps every screen showing a role the same way.
+   */
+  function decorateUser(u) {
+    if (!u) { return u; }
+    var role = global.MockData.ROLES[u.role];
+    u.name = u.displayName || u.username;
+    u.roleName = role ? role.name : u.role;
+    u.status = u.active ? 'ACTIVE' : 'DISABLED';
+    u.lastSignIn = u.lastLoginAt || null;
+    return u;
+  }
+
+  /**
+   * The exact set of fields PUT /api/users/{id} replaces.
+   *
+   * It is a replace, not a patch, so anything omitted here is cleared on the
+   * server. Username and password are absent on purpose - neither can be
+   * changed through this route.
+   */
+  function userProfilePayload(u, overrides) {
+    var payload = {
+      firstName: u.firstName || null,
+      lastName: u.lastName || null,
+      email: u.email || null,
+      jobTitle: u.jobTitle || null,
+      role: u.role,
+      active: u.active
+    };
+    Object.keys(overrides || {}).forEach(function (k) { payload[k] = overrides[k]; });
+    return payload;
+  }
 
   var admin = {
-    /** MOCK */
+    /** LIVE - GET /api/users */
     users: function () {
-      return mockRespond(function () {
-        return db().users.map(function (u) {
-          var out = clone(u);
-          out.roleName = global.MockData.ROLES[u.role] ? global.MockData.ROLES[u.role].name : u.role;
-          return out;
-        });
+      return http('GET', '/api/users').then(function (rows) {
+        return unwrap(rows).map(decorateUser);
       });
     },
 
-    /** MOCK */
+    /** LIVE - GET /api/users/{id} */
+    getUser: function (userId) {
+      return http('GET', '/api/users/' + encodeURIComponent(userId)).then(decorateUser);
+    },
+
+    /** LIVE - GET /api/users/me. The only user endpoint any role may call. */
+    me: function () {
+      return http('GET', '/api/users/me').then(decorateUser);
+    },
+
+    /** LIVE - POST /api/users */
+    createUser: function (payload) {
+      return http('POST', '/api/users', payload).then(decorateUser);
+    },
+
+    /** LIVE - PUT /api/users/{id}. Send the whole profile; see userProfilePayload. */
+    updateUser: function (userId, payload) {
+      return http('PUT', '/api/users/' + encodeURIComponent(userId), payload).then(decorateUser);
+    },
+
+    /** LIVE - POST /api/users/{id}/reset-password. Answers 204, so no body. */
+    resetPassword: function (userId, newPassword) {
+      return http('POST', '/api/users/' + encodeURIComponent(userId) + '/reset-password',
+        { newPassword: newPassword });
+    },
+
+    /** LIVE - DELETE /api/users/{id} */
+    deleteUser: function (userId) {
+      return http('DELETE', '/api/users/' + encodeURIComponent(userId));
+    },
+
+    /**
+     * LIVE - a role change, expressed as the profile replacement it really is.
+     *
+     * The current profile is read first so the other fields survive the PUT.
+     * Reading first also means the server's last-administrator guard judges the
+     * account's real current state rather than whatever the list happened to be
+     * showing when it was last refreshed.
+     */
     assignRole: function (userId, role) {
-      return mockRespond(function () {
-        var u = byId(db().users, 'userId', userId);
-        if (!u) { throw new ApiError(404, 'User not found: ' + userId); }
-        if (!global.MockData.ROLES[role]) { throw new ApiError(400, 'Unknown role: ' + role, 'role'); }
-        u.role = role;
-        commit();
-        return clone(u);
+      return admin.getUser(userId).then(function (u) {
+        return admin.updateUser(userId, userProfilePayload(u, { role: role }));
       });
     },
 
-    /** MOCK */
+    /** LIVE - enable / disable, by the same read-then-replace as assignRole. */
     setStatus: function (userId, status) {
-      return mockRespond(function () {
-        var u = byId(db().users, 'userId', userId);
-        if (!u) { throw new ApiError(404, 'User not found: ' + userId); }
-        u.status = status;
-        commit();
-        return clone(u);
+      return admin.getUser(userId).then(function (u) {
+        return admin.updateUser(userId, userProfilePayload(u, { active: status === 'ACTIVE' }));
       });
     },
 

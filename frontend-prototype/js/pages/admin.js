@@ -31,7 +31,12 @@
     + '</div>'
     + '<div class="stack">'
     +   '<section class="card"><div class="card__head"><h2>Users and roles</h2>'
-    +     '<div class="spacer"></div><span class="pill" id="userCount"></span></div>'
+    +     '<div class="spacer"></div><span class="pill" id="userCount"></span>'
+    +     (Auth.can('admin.roles')
+          ? ' <button class="btn btn--primary btn--sm" type="button" id="newUser">New user</button>'
+          : '')
+    +     '</div>'
+    +     '<div id="formBanner"></div>'
     +     '<div id="usersHost">' + UI.loading('Loading users…') + '</div></section>'
     +   '<div class="grid grid--2">'
     +     '<section class="card"><div class="card__head"><h2>Role capabilities</h2></div>'
@@ -45,6 +50,9 @@
     +     '<div id="integrationHost">' + UI.loading('Loading…') + '</div></section>'
     + '</div>';
 
+  var newUserBtn = UI.qs('#newUser');
+  if (newUserBtn) { newUserBtn.addEventListener('click', function () { createUser(); }); }
+
   renderRoles();
   loadUsers();
   loadLookups();
@@ -54,109 +62,176 @@
 
   function loadUsers() {
     API.admin.users().then(function (users) {
-      UI.qs('#userCount').textContent = users.length + ' accounts';
+      UI.qs('#userCount').textContent = users.length + (users.length === 1 ? ' account' : ' accounts');
+
+      if (!users.length) {
+        /* Not an error state. The table starts empty and sign-in is still
+           working, because the server falls back to the break-glass accounts in
+           its configuration. Saying so is the whole point of this message: an
+           administrator who does not know that will not know to leave it. */
+        UI.qs('#usersHost').innerHTML = UI.emptyState(
+          'No accounts yet',
+          'You are signed in with a break-glass account defined in the server configuration. '
+            + 'Create a real account so day-to-day sign-in no longer depends on it.',
+          Auth.can('admin.roles')
+            ? '<button class="btn btn--primary" type="button" id="firstUser">Create the first account</button>'
+            : '');
+        var first = UI.qs('#firstUser');
+        if (first) { first.addEventListener('click', function () { createUser(); }); }
+        return;
+      }
+
       UI.qs('#usersHost').innerHTML = '<div class="table-wrap"><table class="data responsive"><thead><tr>'
-        + '<th scope="col">User</th><th scope="col">Email</th><th scope="col">Role</th>'
-        + '<th scope="col">Primary site</th><th scope="col">Status</th><th scope="col">Last sign-in</th>'
+        + '<th scope="col">User</th><th scope="col">Email</th><th scope="col">Job title</th>'
+        + '<th scope="col">Role</th><th scope="col">Status</th><th scope="col">Last sign-in</th>'
         + '<th scope="col"><span class="visually-hidden">Actions</span></th>'
         + '</tr></thead><tbody>'
         + users.map(function (u) {
+            var href = 'user-detail.html?id=' + encodeURIComponent(u.userId);
             return '<tr>'
-              + '<td data-label="User"><span class="cell-strong">' + UI.esc(u.name) + '</span>'
-              +   '<div class="cell-sub mono">' + UI.esc(u.userId) + '</div></td>'
-              + '<td data-label="Email">' + UI.esc(u.email) + '</td>'
+              + '<td data-label="User"><a class="cell-strong" href="' + href + '">' + UI.esc(u.name) + '</a>'
+              +   '<div class="cell-sub mono">' + UI.esc(u.username) + '</div></td>'
+              + '<td data-label="Email">' + UI.esc(u.email || '—') + '</td>'
+              + '<td data-label="Job title">' + UI.esc(u.jobTitle || '—') + '</td>'
               + '<td data-label="Role">' + UI.esc(u.roleName) + '</td>'
-              + '<td data-label="Primary site">' + UI.esc(u.site) + '</td>'
-              + '<td data-label="Status">' + (u.status === 'ACTIVE'
+              + '<td data-label="Status">' + (u.active
                   ? '<span class="badge badge--ok">Active</span>'
                   : '<span class="badge badge--neutral">Disabled</span>') + '</td>'
-              + '<td data-label="Last sign-in">' + UI.esc(UI.fmtDateTime(u.lastSignIn)) + '</td>'
+              + '<td data-label="Last sign-in">'
+              +   UI.esc(u.lastSignIn ? UI.fmtDateTime(u.lastSignIn) : 'Never') + '</td>'
               + '<td class="actions" data-label="">'
+              +   '<a class="btn btn--sm" href="' + href + '">Open</a>'
               +   (Auth.can('admin.roles')
-                  ? '<button class="btn btn--sm" type="button" data-role="' + UI.esc(u.userId) + '">Change role</button> '
-                    + '<button class="btn btn--sm" type="button" data-status="' + UI.esc(u.userId) + '">'
-                    + (u.status === 'ACTIVE' ? 'Disable' : 'Enable') + '</button>'
-                  : '<span class="subtle xsmall">View only</span>')
+                  ? ' <button class="btn btn--sm" type="button" data-status="' + UI.esc(u.userId) + '">'
+                    + (u.active ? 'Disable' : 'Enable') + '</button>'
+                  : '')
               + '</td></tr>';
           }).join('')
         + '</tbody></table></div>';
 
-      UI.qsa('#usersHost [data-role]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          changeRole(users.filter(function (u) { return u.userId === btn.dataset.role; })[0]);
-        });
-      });
       UI.qsa('#usersHost [data-status]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           toggleStatus(users.filter(function (u) { return u.userId === btn.dataset.status; })[0]);
         });
       });
+    }).catch(function (err) {
+      UI.qs('#usersHost').innerHTML = UI.emptyState('Users could not be loaded', err.message, '');
     });
   }
 
-  function changeRole(u) {
-    UI.modal({
-      title: 'Change role for ' + u.name,
-      body: '<p class="small muted">Roles are issued as claims by the identity provider in production. '
-        + 'This screen represents the application-side role mapping.</p>'
-        + '<div class="field mt-4"><label class="field__label" for="newRole">Role</label>'
-        + '<select id="newRole" data-autofocus>' + UI.selectOptions(ROLE_LIST, 'code', 'label', u.role) + '</select></div>'
-        + '<div id="roleDesc" class="alert alert--info mt-4"><div class="alert__body"></div></div>',
-      buttons: [
-        { label: 'Cancel', value: null },
-        { label: 'Assign role', variant: 'primary',
-          onClick: function (root) { return root.querySelector('#newRole').value; } }
-      ],
-      onOpen: function (root) {
-        var sel = root.querySelector('#newRole');
-        function describe() {
-          var r = D.ROLES[sel.value];
-          root.querySelector('#roleDesc .alert__body').innerHTML =
-            '<div class="alert__title">' + UI.esc(r.name) + '</div>' + UI.esc(r.description)
-            + '<div class="xsmall mt-4">' + r.can.length + ' capabilities granted.</div>';
-        }
-        sel.addEventListener('change', describe);
-        describe();
-      }
-    }).then(function (role) {
-      if (!role || role === u.role) { return; }
-      return UI.confirm({
-        title: 'Confirm role change',
-        message: 'Changing a role immediately changes what this user can see and do.',
-        summary: [
-          { label: 'User', value: u.name },
-          { label: 'Current role', value: D.ROLES[u.role].name },
-          { label: 'New role', value: D.ROLES[role].name }
-        ],
-        warning: role === 'ADMIN' ? 'System Administrator includes audit export and integration settings.' : '',
-        confirmLabel: 'Assign role'
-      }).then(function (ok) {
-        if (!ok) { return; }
-        return API.admin.assignRole(u.userId, role).then(function () {
-          UI.toast('Role updated', u.name + ' is now ' + D.ROLES[role].name + '.', 'success');
-          loadUsers();
-        });
-      });
-    }).catch(function (err) { UI.toast('Role change failed', err.message, 'danger'); });
+  /* ------------------------------------------------------- create account */
+
+  /** A .field wrapper, so UI.setFieldError can find and mark the input. */
+  function field(name, label, control, hint) {
+    return '<div class="field"><label class="field__label" for="f_' + name + '">' + UI.esc(label) + '</label>'
+      + control
+      + (hint ? '<div class="xsmall muted">' + UI.esc(hint) + '</div>' : '')
+      + '<div class="field__error" role="alert"></div></div>';
   }
 
+  function inputFor(name, value, type) {
+    return '<input id="f_' + name + '" name="' + name + '" type="' + (type || 'text') + '"'
+      + ' value="' + UI.esc(value || '') + '" autocomplete="off">';
+  }
+
+  /**
+   * Creates an account.
+   *
+   * <p>Takes an optional prefill so a rejected attempt - a username already in
+   * use, a password below the server's minimum - can be reopened with what was
+   * typed still in it. Losing six fields to a 409 is the kind of small cruelty
+   * that makes people stop using a screen.</p>
+   */
+  function createUser(prefill) {
+    /* Called both directly and as a click handler, where the argument is an Event. */
+    if (!prefill || typeof prefill.preventDefault === 'function') { prefill = {}; }
+
+    UI.modal({
+      title: 'New user',
+      wide: true,
+      body: ''
+        + '<div class="grid grid--2">'
+        +   field('username', 'Username',
+              '<input id="f_username" name="username" type="text" autocomplete="off" data-autofocus'
+              + ' value="' + UI.esc(prefill.username || '') + '">',
+              'Letters, digits and . _ - @ only. This cannot be changed later.')
+        +   field('password', 'Temporary password', inputFor('password', prefill.password),
+              'At least 10 characters.')
+        +   field('firstName', 'First name', inputFor('firstName', prefill.firstName))
+        +   field('lastName', 'Last name', inputFor('lastName', prefill.lastName))
+        +   field('email', 'Email', inputFor('email', prefill.email, 'email'))
+        +   field('jobTitle', 'Job title', inputFor('jobTitle', prefill.jobTitle))
+        +   field('role', 'Role', '<select id="f_role" name="role">'
+              + UI.selectOptions(ROLE_LIST, 'code', 'label', prefill.role || 'FIELD') + '</select>')
+        + '</div>'
+        + '<div class="alert alert--info mt-4"><div class="alert__body">'
+        + 'The password is shown in plain text here so you can hand it over. The account holder '
+        + 'should change it after their first sign-in - the system does not force that yet.'
+        + '</div></div>',
+      buttons: [
+        { label: 'Cancel', value: null },
+        { label: 'Create account', variant: 'primary',
+          onClick: function (root) {
+            var payload = {
+              username: root.querySelector('#f_username').value.trim(),
+              password: root.querySelector('#f_password').value,
+              firstName: root.querySelector('#f_firstName').value.trim(),
+              lastName: root.querySelector('#f_lastName').value.trim(),
+              email: root.querySelector('#f_email').value.trim(),
+              jobTitle: root.querySelector('#f_jobTitle').value.trim(),
+              role: root.querySelector('#f_role').value,
+              active: true
+            };
+            UI.clearErrors(root);
+            if (!payload.username) {
+              UI.setFieldError('username', 'Enter a username.', root);
+              return false;
+            }
+            if (payload.password.length < 10) {
+              UI.setFieldError('password', 'Use at least 10 characters.', root);
+              return false;
+            }
+            return payload;
+          } }
+      ]
+    }).then(function (payload) {
+      if (!payload) { return; }
+      return API.admin.createUser(payload).then(function (created) {
+        UI.toast('Account created', created.name + ' can sign in as ' + created.roleName + '.', 'success');
+        loadUsers();
+      }).catch(function (err) {
+        UI.toast('Account not created', err.message, 'danger');
+        createUser(payload);
+      });
+    });
+  }
+
+  /* ------------------------------------------------------- enable/disable */
+
   function toggleStatus(u) {
-    var next = u.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    var disabling = u.active;
     UI.confirm({
-      title: (next === 'DISABLED' ? 'Disable' : 'Enable') + ' account',
-      message: next === 'DISABLED'
-        ? 'A disabled account cannot sign in. Existing asset assignments are not changed.'
-        : 'The user will be able to sign in again with their existing role.',
-      summary: [{ label: 'User', value: u.name }, { label: 'New status', value: next }],
-      confirmLabel: next === 'DISABLED' ? 'Disable account' : 'Enable account',
-      danger: next === 'DISABLED'
+      title: (disabling ? 'Disable' : 'Enable') + ' account',
+      message: disabling
+        ? 'A disabled account cannot sign in. Asset assignments and audit history are unchanged.'
+        : 'The account will be able to sign in again with its existing role and password.',
+      summary: [
+        { label: 'User', value: u.name },
+        { label: 'Username', value: u.username },
+        { label: 'Role', value: u.roleName }
+      ],
+      warning: disabling && u.role === 'ADMIN'
+        ? 'This is an administrator. The server refuses to disable the last active one.'
+        : '',
+      confirmLabel: disabling ? 'Disable account' : 'Enable account',
+      danger: disabling
     }).then(function (ok) {
       if (!ok) { return; }
-      return API.admin.setStatus(u.userId, next).then(function () {
-        UI.toast('Account updated', u.name + ' is now ' + next.toLowerCase() + '.', 'success');
+      return API.admin.setStatus(u.userId, disabling ? 'DISABLED' : 'ACTIVE').then(function () {
+        UI.toast('Account updated', u.name + ' is now ' + (disabling ? 'disabled' : 'active') + '.', 'success');
         loadUsers();
       });
-    }).catch(function (err) { UI.toast('Update failed', err.message, 'danger'); });
+    }).catch(function (err) { UI.showFormError(err.message); });
   }
 
   /* -------------------------------------------------- role capabilities */

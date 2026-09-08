@@ -26,6 +26,19 @@ public record UserResponse(
         Instant createdAt,
         Instant updatedAt) {
 
+    /**
+     * A profile for a configured break-glass account, which has no database row.
+     *
+     * <p>Returned by {@code GET /api/users/me} so the interface can learn its own
+     * role even when signed in with a fallback credential. The null {@code userId}
+     * is the signal that this account cannot be edited through {@code /api/users}:
+     * it lives in configuration, not in the table.</p>
+     */
+    public static UserResponse breakGlass(String username, UserRole role) {
+        return new UserResponse(null, username, null, null, username, null, null,
+                role, true, null, null, null);
+    }
+
     public static UserResponse from(AppUser user) {
         if (user == null) {
             return null;
