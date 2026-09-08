@@ -144,16 +144,38 @@
 
   function passwordCard(u) {
     if (!canEdit) { return ''; }
+
     return '<section class="card"><div class="card__head"><h2>Password</h2></div>'
       + '<div class="card__body">'
-      +   field('newPassword', 'New password',
-            '<input id="f_newPassword" name="newPassword" type="text" autocomplete="new-password">',
-            'At least 10 characters. Shown in plain text so you can hand it over.')
-      +   '<p class="small muted">Setting a password here does not notify the account holder and does '
-      +   'not sign them out of anywhere. Tell them yourself.</p>'
+      +   '<p class="small">Email ' + UI.esc(u.name) + ' a single-use link so they can set their '
+      +   'own password. Nobody else ever sees it, including you.</p>'
+      +   (u.email
+          ? '<p class="small muted">Goes to <span class="mono">' + UI.esc(u.email) + '</span>. '
+            + 'The link works once and expires after an hour.</p>'
+          : '<div class="alert alert--warning"><span class="alert__icon" aria-hidden="true">!</span>'
+            + '<div class="alert__body">This account has no email address, so the link cannot be '
+            + 'sent. It will be shown here instead for you to pass on. Adding an address above is '
+            + 'the better fix.</div></div>')
       + '</div>'
       + '<div class="card__foot"><div class="spacer"></div>'
-      +   '<button class="btn" type="button" id="resetPassword">Set password</button></div>'
+      +   '<button class="btn btn--primary" type="button" id="sendLink">Email a password link</button>'
+      + '</div>'
+
+      /* The direct route is kept, but folded away. It is the worse option
+         whenever a mailbox exists, and a screen that presents both equally
+         invites the habit of choosing it. */
+      + '<div class="card__body" style="border-top:1px solid var(--c-border)">'
+      +   '<details>'
+      +     '<summary class="small">Set a password directly instead</summary>'
+      +     '<p class="small muted mt-4">For an account with no working mailbox - a shared '
+      +     'warehouse login, someone not yet provisioned. You will know the password, and you '
+      +     'still have to get it to them somehow.</p>'
+      +     field('newPassword', 'New password',
+              '<input id="f_newPassword" name="newPassword" type="text" autocomplete="new-password">',
+              'At least 10 characters. Shown in plain text so you can read it out.')
+      +     '<button class="btn" type="button" id="resetPassword">Set password</button>'
+      +   '</details>'
+      + '</div>'
       + '</section>';
   }
 
@@ -180,6 +202,9 @@
   function wire(u, isSelf) {
     var save = UI.qs('#saveProfile');
     if (save) { save.addEventListener('click', function () { saveProfile(u, isSelf); }); }
+
+    var send = UI.qs('#sendLink');
+    if (send) { send.addEventListener('click', function () { sendLink(u); }); }
 
     var reset = UI.qs('#resetPassword');
     if (reset) { reset.addEventListener('click', function () { resetPassword(u); }); }
@@ -233,6 +258,48 @@
         render();
       });
     }).catch(function (err) { UI.handleApiError(err, page); });
+  }
+
+  /**
+   * Issues a fresh single-use link.
+   *
+   * <p>Always RESET rather than INVITE from this screen: the account already
+   * exists and may already be in use, so an hour is the right lifetime. A
+   * seven-day link to a live account is a spare key left under the mat.</p>
+   */
+  function sendLink(u) {
+    var button = UI.qs('#sendLink');
+    var restore = function () {
+      if (button) { button.disabled = false; button.textContent = 'Email a password link'; }
+    };
+    if (button) { button.disabled = true; button.textContent = 'Sending…'; }
+
+    API.admin.invite(u.userId, 'RESET').then(function (invitation) {
+      restore();
+      if (invitation && invitation.sent) {
+        UI.toast('Link sent', 'A password link was emailed to ' + invitation.sentTo + '.', 'success');
+        return;
+      }
+      UI.modal({
+        title: 'Pass this link to ' + u.name,
+        body: '<div class="alert alert--warning"><span class="alert__icon" aria-hidden="true">!</span>'
+          + '<div class="alert__body"><div class="alert__title">No email was sent</div>'
+          + 'Mail is not configured, or this account has no address on file.</div></div>'
+          + '<div class="field mt-4"><label class="field__label" for="resetLink">Password link</label>'
+          + '<input id="resetLink" name="resetLink" type="text" readonly data-autofocus value="'
+          + UI.esc(invitation ? invitation.link : '') + '"></div>'
+          + '<p class="small muted">Treat it like a password. It works once and expires on '
+          + UI.esc(invitation ? UI.fmtDateTime(invitation.expiresAt) : '') + '.</p>',
+        buttons: [{ label: 'Done', value: null, variant: 'primary' }],
+        onOpen: function (root) {
+          var input = root.querySelector('#resetLink');
+          if (input) { input.select(); }
+        }
+      });
+    }, function (err) {
+      restore();
+      UI.handleApiError(err, page);
+    });
   }
 
   function resetPassword(u) {

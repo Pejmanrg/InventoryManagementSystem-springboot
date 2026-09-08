@@ -155,8 +155,6 @@
               '<input id="f_username" name="username" type="text" autocomplete="off" data-autofocus'
               + ' value="' + UI.esc(prefill.username || '') + '">',
               'Letters, digits and . _ - @ only. This cannot be changed later.')
-        +   field('password', 'Temporary password', inputFor('password', prefill.password),
-              'At least 10 characters.')
         +   field('firstName', 'First name', inputFor('firstName', prefill.firstName))
         +   field('lastName', 'Last name', inputFor('lastName', prefill.lastName))
         +   field('email', 'Email', inputFor('email', prefill.email, 'email'))
@@ -165,8 +163,9 @@
               + UI.selectOptions(ROLE_LIST, 'code', 'label', prefill.role || 'FIELD') + '</select>')
         + '</div>'
         + '<div class="alert alert--info mt-4"><div class="alert__body">'
-        + 'The password is shown in plain text here so you can hand it over. The account holder '
-        + 'should change it after their first sign-in - the system does not force that yet.'
+        + 'No password is set here. The new account is emailed a single-use link and chooses its '
+        + 'own, so nobody else - including you - ever knows it. Give an email address, or the link '
+        + 'will have to be passed on by hand.'
         + '</div></div>',
       buttons: [
         { label: 'Cancel', value: null },
@@ -174,7 +173,6 @@
           onClick: function (root) {
             var payload = {
               username: root.querySelector('#f_username').value.trim(),
-              password: root.querySelector('#f_password').value,
               firstName: root.querySelector('#f_firstName').value.trim(),
               lastName: root.querySelector('#f_lastName').value.trim(),
               email: root.querySelector('#f_email').value.trim(),
@@ -187,22 +185,70 @@
               UI.setFieldError('username', 'Enter a username.', root);
               return false;
             }
-            if (payload.password.length < 10) {
-              UI.setFieldError('password', 'Use at least 10 characters.', root);
-              return false;
-            }
             return payload;
           } }
       ]
     }).then(function (payload) {
       if (!payload) { return; }
+
+      /* Two-argument then, not then().catch(): a catch here would also swallow
+         failures from the success branch, and "account created" must not be
+         reported as "account not created" because the follow-up broke. */
       return API.admin.createUser(payload).then(function (created) {
-        UI.toast('Account created', created.name + ' can sign in as ' + created.roleName + '.', 'success');
-        loadUsers();
-      }).catch(function (err) {
+        return invite(created);
+      }, function (err) {
         UI.toast('Account not created', err.message, 'danger');
         createUser(payload);
       });
+    });
+  }
+
+  /** Issues the first link for a freshly created account. */
+  function invite(created) {
+    return API.admin.invite(created.userId, 'INVITE').then(function (invitation) {
+      loadUsers();
+      showInvitation(created, invitation);
+    }, function (err) {
+      /* The account exists and only the invitation failed. Saying so precisely
+         matters - told "it failed", an administrator creates it again and hits
+         a duplicate-username error they cannot explain. */
+      loadUsers();
+      UI.showFormError('Account ' + created.username + ' was created, but the invitation could '
+        + 'not be issued: ' + err.message + ' Open the account and send it again.');
+    });
+  }
+
+  function showInvitation(user, invitation) {
+    if (invitation && invitation.sent) {
+      UI.modal({
+        title: 'Invitation sent',
+        body: '<p>' + UI.esc(user.name) + ' has been emailed a link to set their own password, at '
+          + '<strong>' + UI.esc(invitation.sentTo) + '</strong>.</p>'
+          + '<p class="small muted">It works once and expires on '
+          + UI.esc(UI.fmtDateTime(invitation.expiresAt)) + '. Until they use it, the account '
+          + 'exists but cannot sign in.</p>',
+        buttons: [{ label: 'Done', value: null, variant: 'primary' }]
+      });
+      return;
+    }
+
+    UI.modal({
+      title: 'Account created - pass this link on',
+      body: '<div class="alert alert--warning"><span class="alert__icon" aria-hidden="true">!</span>'
+        + '<div class="alert__body"><div class="alert__title">No email was sent</div>'
+        + 'Either mail is not configured or this account has no address on file. Give '
+        + UI.esc(user.name) + ' the link below yourself.</div></div>'
+        + '<div class="field mt-4"><label class="field__label" for="inviteLink">Invitation link</label>'
+        + '<input id="inviteLink" name="inviteLink" type="text" readonly data-autofocus value="'
+        + UI.esc(invitation ? invitation.link : '') + '"></div>'
+        + '<p class="small muted">Treat it like a password: anyone holding it can set this '
+        + 'account\'s password once, until '
+        + UI.esc(invitation ? UI.fmtDateTime(invitation.expiresAt) : '') + '.</p>',
+      buttons: [{ label: 'Done', value: null, variant: 'primary' }],
+      onOpen: function (root) {
+        var input = root.querySelector('#inviteLink');
+        if (input) { input.select(); }
+      }
     });
   }
 

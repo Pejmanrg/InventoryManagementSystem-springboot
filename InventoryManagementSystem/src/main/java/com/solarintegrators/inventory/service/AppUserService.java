@@ -4,19 +4,21 @@ import com.solarintegrators.inventory.dto.request.CreateUserRequest;
 import com.solarintegrators.inventory.dto.request.ResetPasswordRequest;
 import com.solarintegrators.inventory.dto.request.UpdateUserRequest;
 import com.solarintegrators.inventory.dto.response.UserResponse;
+import com.solarintegrators.inventory.exception.DuplicateResourceException;
 import com.solarintegrators.inventory.exception.InvalidRequestException;
+import com.solarintegrators.inventory.exception.ResourceNotFoundException;
 import com.solarintegrators.inventory.model.AppUser;
 import com.solarintegrators.inventory.model.UserRole;
 import com.solarintegrators.inventory.repository.AppUserRepository;
+import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Sign-in accounts (CSC-09 Identity &amp; Access).
@@ -37,7 +39,17 @@ import org.springframework.web.server.ResponseStatusException;
  *
  * <p>Passwords are hashed with BCrypt before they reach the entity, so no
  * plaintext credential exists past the boundary of the method that received
- * it.</p>
+ * it. Better still, {@link InvitationService} means most accounts never have a
+ * password chosen for them at all - the holder sets their own through a
+ * single-use link, and nobody else ever knows it.</p>
+ *
+ * <p><strong>On exception types.</strong> The methods here throw the exception
+ * classes in the {@code exception} package rather than
+ * {@code ResponseStatusException}. That is not stylistic:
+ * {@code GlobalExceptionHandler} has no handler for the latter, so it would be
+ * swallowed by the catch-all and returned as a 500 with a generic message -
+ * turning "that username is taken" into "the request could not be
+ * completed".</p>
  */
 @Service
 @Transactional
@@ -91,18 +103,28 @@ public class AppUserService {
         if (appUserRepository.existsByUsernameIgnoreCase(username)) {
             auditService.recordDenied("USER_CREATE", "USER", username,
                     "Create rejected - username " + username + " already exists.");
-            throw conflict("An account with the username " + username + " already exists.");
+            throw new DuplicateResourceException("USER_USERNAME_DUPLICATE", "username",
+                    "An account with the username " + username + " already exists.");
         }
 
         String email = trimToNull(request.email());
         if (email != null && appUserRepository.existsByEmailIgnoreCase(email)) {
             auditService.recordDenied("USER_CREATE", "USER", username,
                     "Create rejected - email " + email + " already in use.");
-            throw conflict("An account with the email address " + email + " already exists.");
+            throw new DuplicateResourceException("USER_EMAIL_DUPLICATE", "email",
+                    "An account with the email address " + email + " already exists.");
         }
 
+        /* No password supplied means the holder will set their own through an
+           invitation; the account is stored with a hash nothing can match until
+           they do. The caller issues the invitation as a separate step, so that
+           re-sending one later uses exactly the same path as sending the
+           first. */
+        String password = request.password();
+        boolean awaitingInvitation = password == null || password.isBlank();
+
         AppUser user = new AppUser(username, request.role(),
-                passwordEncoder.encode(request.password()));
+                awaitingInvitation ? unusablePassword() : passwordEncoder.encode(password));
         user.setFirstName(trimToNull(request.firstName()));
         user.setLastName(trimToNull(request.lastName()));
         user.setEmail(email);
@@ -111,7 +133,10 @@ public class AppUserService {
 
         AppUser saved = appUserRepository.save(user);
         auditService.record("USER_CREATE", "USER", saved.getUserId(),
-                "Account " + saved.getUsername() + " created with role " + saved.getRole() + ".");
+                "Account " + saved.getUsername() + " created with role " + saved.getRole()
+                        + (awaitingInvitation
+                            ? ", awaiting an invitation to set a password."
+                            : ", with a password set by " + auditService.currentActor() + "."));
         return UserResponse.from(saved);
     }
 
@@ -122,7 +147,8 @@ public class AppUserService {
         if (email != null && appUserRepository.existsByEmailIgnoreCaseAndUserIdNot(email, userId)) {
             auditService.recordDenied("USER_UPDATE", "USER", userId,
                     "Update rejected - email " + email + " already in use.");
-            throw conflict("Another account already uses the email address " + email + ".");
+            throw new DuplicateResourceException("USER_EMAIL_DUPLICATE", "email",
+                    "Another account already uses the email address " + email + ".");
         }
 
         UserRole previousRole = user.getRole();
@@ -198,8 +224,21 @@ public class AppUserService {
 
     private AppUser require(UUID userId) {
         return appUserRepository.findById(userId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "No account found with id " + userId + "."));
+                .orElseThrow(() -> new ResourceNotFoundException("USER_NOT_FOUND",
+                        "No account found with id " + userId + "."));
+    }
+
+    /**
+     * A hash that no password can match, for an account awaiting its invitation.
+     *
+     * <p>Random rather than a fixed sentinel. A constant would be byte-identical
+     * across every such row, which quietly labels in the database exactly which
+     * accounts have never been claimed.</p>
+     */
+    private String unusablePassword() {
+        byte[] noise = new byte[32];
+        new SecureRandom().nextBytes(noise);
+        return passwordEncoder.encode(Base64.getEncoder().encodeToString(noise));
     }
 
     /** Refuses an action that would remove the only way back in. */
@@ -213,7 +252,7 @@ public class AppUserService {
         if (remaining == 0) {
             auditService.recordDenied("USER_UPDATE", "USER", user.getUserId(),
                     "Rejected - would " + action + ".");
-            throw conflict("You cannot " + action
+            throw new IllegalStateException("You cannot " + action
                     + ". Create or activate another administrator first.");
         }
     }
@@ -224,12 +263,9 @@ public class AppUserService {
         if (actor != null && actor.equalsIgnoreCase(user.getUsername())) {
             auditService.recordDenied("USER_UPDATE", "USER", user.getUserId(),
                     "Rejected - attempt to " + action + ".");
-            throw conflict("You cannot " + action + ". Ask another administrator to do it.");
+            throw new IllegalStateException(
+                    "You cannot " + action + ". Ask another administrator to do it.");
         }
-    }
-
-    private static ResponseStatusException conflict(String message) {
-        return new ResponseStatusException(HttpStatus.CONFLICT, message);
     }
 
     private static String trimToNull(String value) {

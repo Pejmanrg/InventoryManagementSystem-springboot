@@ -14,6 +14,8 @@
      reports       computed client-side from live assets / inventory / locations
      admin.lookups locations come from /api/locations
      admin.users   UserController         /api/users (ADMIN only)
+     invitations   InvitationController   /api/invitations, /api/password-reset
+                                          - the only unauthenticated calls
 
    WHAT IS STILL MOCKED - no backend exists for these yet (Phase 2):
      maintenance   work orders   - no MaintenanceController / WorkOrder entity
@@ -35,6 +37,17 @@
 
   /** Deployed Cloud Run service. Change this one line to point elsewhere. */
   var API_BASE = 'https://inventory-api-173479193959.us-west2.run.app';
+
+  /**
+   * Marks a call that must carry no Authorization header at all.
+   *
+   * Not the same as simply having no session. Spring's Basic authentication
+   * filter runs before the authorization rules, so a stale or wrong credential
+   * left in sessionStorage is rejected with 401 even on a path the server
+   * permits anonymously - which would break the password-reset page for exactly
+   * the person most likely to have a wrong credential saved.
+   */
+  var ANONYMOUS = { anonymous: true };
 
   /** Page size used for screens that render a full list rather than paging. */
   var PAGE_SIZE = 500;
@@ -97,7 +110,7 @@
    */
   function http(method, path, body, params, credentialOverride) {
     var headers = { 'Accept': 'application/json' };
-    var cred = credentialOverride || authHeader();
+    var cred = credentialOverride === ANONYMOUS ? null : (credentialOverride || authHeader());
     if (cred) { headers['Authorization'] = cred; }
     if (body !== undefined && body !== null) {
       headers['Content-Type'] = 'application/json';
@@ -881,6 +894,20 @@
       return http('PUT', '/api/users/' + encodeURIComponent(userId), payload).then(decorateUser);
     },
 
+    /**
+     * LIVE - POST /api/users/{id}/invite.
+     *
+     * Emails a single-use link so the account holder sets their own password.
+     * `purpose` is INVITE for a new account or RESET for an existing one; they
+     * differ only in wording and lifetime. Resolves to
+     * { sent, sentTo, expiresAt, link } - `sent` false means mail is not
+     * configured or was refused, and the link has to be passed on by hand.
+     */
+    invite: function (userId, purpose) {
+      return http('POST', '/api/users/' + encodeURIComponent(userId) + '/invite',
+        null, { purpose: purpose || 'INVITE' });
+    },
+
     /** LIVE - POST /api/users/{id}/reset-password. Answers 204, so no body. */
     resetPassword: function (userId, newPassword) {
       return http('POST', '/api/users/' + encodeURIComponent(userId) + '/reset-password',
@@ -939,6 +966,37 @@
     employees: function () { return employees(); }
   };
 
+  /* ========================================================== INVITATIONS */
+  /* LIVE and deliberately unauthenticated - InvitationController. Every caller
+     here is someone who cannot sign in, so a credential is not available to
+     send. Possession of a single-use token stands in for one. */
+
+  var invitations = {
+    /** GET /api/invitations/{token} - who the link belongs to, and why it exists. */
+    check: function (token) {
+      return http('GET', '/api/invitations/' + encodeURIComponent(token),
+        null, null, ANONYMOUS);
+    },
+
+    /** POST /api/invitations/{token} - sets the password and burns the link. */
+    accept: function (token, newPassword) {
+      return http('POST', '/api/invitations/' + encodeURIComponent(token),
+        { newPassword: newPassword }, null, ANONYMOUS);
+    },
+
+    /**
+     * POST /api/password-reset - "I forgot my password".
+     *
+     * Resolves for every input the server accepts, including usernames that do
+     * not exist. The endpoint answers 202 regardless by design; a caller that
+     * distinguished the cases would undo that.
+     */
+    requestReset: function (usernameOrEmail) {
+      return http('POST', '/api/password-reset',
+        { usernameOrEmail: usernameOrEmail }, null, ANONYMOUS);
+    }
+  };
+
   /* ------------------------------------------------------------- exports */
 
   global.API = {
@@ -951,6 +1009,7 @@
     maintenance: maintenance,
     reports: reports,
     admin: admin,
-    audit: auditApi
+    audit: auditApi,
+    invitations: invitations
   };
 })(window);

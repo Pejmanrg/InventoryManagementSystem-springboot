@@ -56,6 +56,15 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    /*
+                     * The only unauthenticated API paths, and they must be:
+                     * everyone they serve is a person who cannot sign in. A
+                     * single-use token delivered to an address already on file
+                     * stands in for the credential. Listed before /api/** -
+                     * these rules are evaluated in order, and the first match
+                     * wins, so putting them after would make them unreachable.
+                     */
+                    .requestMatchers("/api/invitations/**", "/api/password-reset").permitAll()
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().denyAll())
             .httpBasic(Customizer.withDefaults());

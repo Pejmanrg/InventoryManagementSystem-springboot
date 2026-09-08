@@ -34,5 +34,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
             + "from AppUser u where lower(u.email) = lower(:email)")
     boolean existsByEmailIgnoreCase(String email);
 
+    /** Used only by the forgot-password flow, which accepts either identifier. */
+    @Query("select u from AppUser u where lower(u.email) = lower(:email)")
+    Optional<AppUser> findByEmailIgnoreCase(String email);
+
     List<AppUser> findAllByOrderByUsernameAsc();
 }

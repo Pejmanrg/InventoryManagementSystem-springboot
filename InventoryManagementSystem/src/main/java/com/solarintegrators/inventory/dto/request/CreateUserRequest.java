@@ -44,7 +44,16 @@ public record CreateUserRequest(
         @NotNull(message = "A role is required.")
         UserRole role,
 
-        @NotBlank(message = "A password is required.")
+        /*
+         * Optional. Omit it and the account is created with a hash nothing can
+         * match, to be replaced by the holder through an invitation link - the
+         * preferred route, because it is the only one where no administrator
+         * ever knows the password. Supplying one directly is still allowed for
+         * an account whose owner has no mailbox to receive a link at.
+         *
+         * @Size ignores null, so the minimum still applies whenever a value is
+         * actually given.
+         */
         @Size(min = 10, max = 100, message = "A password must be at least 10 characters.")
         String password,
 

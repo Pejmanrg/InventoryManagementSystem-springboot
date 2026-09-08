@@ -3,9 +3,12 @@ package com.solarintegrators.inventory.controller;
 import com.solarintegrators.inventory.dto.request.CreateUserRequest;
 import com.solarintegrators.inventory.dto.request.ResetPasswordRequest;
 import com.solarintegrators.inventory.dto.request.UpdateUserRequest;
+import com.solarintegrators.inventory.dto.response.InvitationIssuedResponse;
 import com.solarintegrators.inventory.dto.response.UserResponse;
+import com.solarintegrators.inventory.model.InvitationPurpose;
 import com.solarintegrators.inventory.model.UserRole;
 import com.solarintegrators.inventory.service.AppUserService;
+import com.solarintegrators.inventory.service.InvitationService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -42,9 +46,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final AppUserService appUserService;
+    private final InvitationService invitationService;
 
-    public UserController(AppUserService appUserService) {
+    public UserController(AppUserService appUserService, InvitationService invitationService) {
         this.appUserService = appUserService;
+        this.invitationService = invitationService;
     }
 
     @GetMapping
@@ -114,8 +120,31 @@ public class UserController {
     }
 
     /**
-     * Sets a new password. Returns 204 rather than the user, so that no part of
-     * a password-changing response can be mistaken for the credential itself.
+     * Emails a single-use link so the account holder can set their own password.
+     *
+     * <p>The same endpoint serves both an initial invitation and a later reset -
+     * they differ only in wording and lifetime - and re-sending is simply
+     * calling it again, which supersedes any outstanding link.</p>
+     *
+     * <p>Prefer this to {@code /reset-password} below. This route is the only
+     * one where the password is known solely to its owner; the other requires
+     * an administrator to choose it and then get it to them somehow.</p>
+     */
+    @PostMapping("/{userId}/invite")
+    @PreAuthorize("hasRole('ADMIN')")
+    public InvitationIssuedResponse invite(
+            @PathVariable UUID userId,
+            @RequestParam(defaultValue = "INVITE") InvitationPurpose purpose) {
+        return invitationService.issue(userId, purpose);
+    }
+
+    /**
+     * Sets a new password directly. Returns 204 rather than the user, so that no
+     * part of a password-changing response can be mistaken for the credential.
+     *
+     * <p>Kept for the case with no working mailbox - a shared warehouse account,
+     * someone whose email is not yet provisioned. {@code /invite} is the better
+     * route whenever it is available.</p>
      */
     @PostMapping("/{userId}/reset-password")
     @PreAuthorize("hasRole('ADMIN')")

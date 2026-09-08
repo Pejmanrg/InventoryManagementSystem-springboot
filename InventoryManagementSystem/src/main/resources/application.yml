@@ -76,6 +76,29 @@ logging:
     # org.hibernate.orm.jdbc.bind: TRACE
 
 app:
+  # Where the front end is served from. Emailed password links point here, so
+  # this MUST be set correctly in every deployed environment - a wrong value
+  # produces links that go nowhere, or worse, somewhere else. It is a setting
+  # rather than something derived from the request's Host header because that
+  # header is supplied by the caller, and a password link built from a forged
+  # one is a password link pointing at an attacker's site.
+  ui:
+    base-url: ${UI_BASE_URL:http://localhost:5500}
+
+  # Microsoft Graph, used to send invitation and password-reset mail.
+  #
+  # Cloud Run blocks outbound SMTP, so Graph is the route rather than a mail
+  # server. Leave these empty and the application still starts and still issues
+  # links - it just hands them to the administrator to pass on instead of
+  # emailing them. The client secret never belongs in this file: inject it from
+  # Secret Manager as APP_MAIL_CLIENT_SECRET.
+  mail:
+    tenant-id: ${APP_MAIL_TENANT_ID:}
+    client-id: ${APP_MAIL_CLIENT_ID:}
+    client-secret: ${APP_MAIL_CLIENT_SECRET:}
+    sender: ${APP_MAIL_SENDER:}
+    from-name: Cal Solar Inventory
+
   security:
     # Origins allowed to call the API from a browser - the front-end prototype
     # served by VS Code Live Server or `python -m http.server`.
