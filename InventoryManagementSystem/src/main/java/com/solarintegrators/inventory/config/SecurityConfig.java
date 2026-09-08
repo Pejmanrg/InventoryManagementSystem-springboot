@@ -8,11 +8,8 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -70,31 +67,18 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * The break-glass accounts from configuration.
+    /*
+     * There is deliberately no UserDetailsService bean here.
      *
-     * <p>No longer the application's user store - it is the fallback consulted
-     * by {@link DatabaseUserDetailsService} for usernames the database does not
-     * contain. Passwords are supplied in plaintext by configuration and hashed
-     * here, so no hash is committed to the repository and no plaintext is held
-     * in memory.</p>
+     * Spring Security auto-configures its authentication provider only when
+     * exactly one UserDetailsService bean exists. Publishing the configured
+     * break-glass accounts as a second bean alongside DatabaseUserDetailsService
+     * makes that count two, Spring wires no provider at all, and every request
+     * returns 401 - including the break-glass account meant to rescue you.
      *
-     * <p>The bean is deliberately typed {@code InMemoryUserDetailsManager}
-     * rather than {@code UserDetailsService}: it must not be mistaken for the
-     * primary store, and {@link DatabaseUserDetailsService} injects it by that
-     * concrete type.</p>
+     * The configured accounts are therefore built inside
+     * DatabaseUserDetailsService, which is the single UserDetailsService bean.
      */
-    @Bean
-    public InMemoryUserDetailsManager configuredUsers(SecurityProperties properties,
-                                                      PasswordEncoder passwordEncoder) {
-        List<UserDetails> users = properties.getUsers().stream()
-                .map(devUser -> (UserDetails) User.withUsername(devUser.getUsername())
-                        .password(passwordEncoder.encode(devUser.getPassword()))
-                        .roles(devUser.getRole())
-                        .build())
-                .toList();
-        return new InMemoryUserDetailsManager(users);
-    }
 
     private CorsConfigurationSource corsConfigurationSource(SecurityProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();
