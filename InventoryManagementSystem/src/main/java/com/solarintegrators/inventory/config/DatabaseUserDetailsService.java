@@ -65,8 +65,26 @@ public class DatabaseUserDetailsService implements UserDetailsService {
 
     private final AppUserRepository appUserRepository;
 
-    /** Break-glass accounts, hashed once at startup. Keyed by lower-cased username. */
-    private final Map<String, UserDetails> configuredUsers = new LinkedHashMap<>();
+    /**
+     * Break-glass accounts, hashed once at startup. Keyed by lower-cased username.
+     *
+     * <p>This holds credential data, not built {@link UserDetails} objects, and
+     * {@link #loadUserByUsername} constructs a fresh instance on every call. That is
+     * not defensive style, it is required. Spring Security's {@code ProviderManager}
+     * enables {@code eraseCredentialsAfterAuthentication} by default: after a
+     * successful sign-in it calls {@code eraseCredentials()} on the returned token,
+     * which walks into the principal and sets {@code User.password} to null. Handing
+     * out a cached instance therefore means the first successful login on a container
+     * instance destroys the stored hash, and every later request on that instance
+     * fails with "Empty encoded password" and a 401 - intermittently, because a fresh
+     * instance starts out working again. Spring's own
+     * {@code InMemoryUserDetailsManager} returns a copy for exactly this reason.</p>
+     */
+    private final Map<String, ConfiguredAccount> configuredUsers = new LinkedHashMap<>();
+
+    /** An immutable break-glass credential. Never handed to Spring Security directly. */
+    private record ConfiguredAccount(String username, String encodedPassword, String role) {
+    }
 
     public DatabaseUserDetailsService(AppUserRepository appUserRepository,
                                       SecurityProperties properties,
@@ -78,10 +96,9 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                 return;
             }
             configuredUsers.put(devUser.getUsername().toLowerCase(),
-                    User.withUsername(devUser.getUsername())
-                            .password(passwordEncoder.encode(devUser.getPassword()))
-                            .roles(devUser.getRole())
-                            .build());
+                    new ConfiguredAccount(devUser.getUsername(),
+                            passwordEncoder.encode(devUser.getPassword()),
+                            devUser.getRole()));
         });
 
         log.info("Authentication ready: database accounts first, {} configured break-glass account(s).",
@@ -102,13 +119,16 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                     .build();
         }
 
-        UserDetails configured = username == null
+        ConfiguredAccount configured = username == null
                 ? null
                 : configuredUsers.get(username.toLowerCase());
 
         if (configured != null) {
             log.debug("Authenticated '{}' from configuration - no database account with that username.", username);
-            return configured;
+            return User.withUsername(configured.username())
+                    .password(configured.encodedPassword())
+                    .roles(configured.role())
+                    .build();
         }
 
         /* Neutral message: whether a username exists is not something an
