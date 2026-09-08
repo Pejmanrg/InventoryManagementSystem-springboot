@@ -96,6 +96,12 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Cloud SQL Unix-socket transport for Cloud Run -->
+        <dependency>
+            <groupId>com.google.cloud.sql</groupId>
+            <artifactId>postgres-socket-factory</artifactId>
+            <version>1.30.0</version>
+        </dependency>
     </dependencies>
 
     <build>
