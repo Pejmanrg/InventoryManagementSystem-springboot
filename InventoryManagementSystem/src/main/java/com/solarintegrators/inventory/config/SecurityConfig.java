@@ -21,17 +21,24 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 /**
  * Phase 1 security.
  *
- * <p>HTTP Basic against an in-memory user store, stateless sessions, and
- * method-level authorization with {@code @PreAuthorize} on the controllers. The
- * roles are the four from the SDD user view: FIELD, MANAGER, FINANCE, ADMIN.</p>
+ * <p>HTTP Basic, stateless sessions, and method-level authorization with
+ * {@code @PreAuthorize} on the controllers. The roles are the four from the SDD
+ * user view: FIELD, MANAGER, FINANCE, ADMIN.</p>
+ *
+ * <p><strong>Where accounts come from.</strong> Accounts live in the
+ * {@code app_users} table and are administered through {@code /api/users}.
+ * {@link DatabaseUserDetailsService} is the primary {@code UserDetailsService}
+ * and resolves them; the configured accounts below remain only as the
+ * break-glass path it falls back to when the database does not know a username.
+ * See that class for why the fallback exists and how precedence works.</p>
  *
  * <p><strong>What this is not.</strong> It is not the production identity
  * design. Microsoft Entra ID with OpenID Connect is Phase 3 (CSC-09). When that
  * arrives, the change is contained: replace {@code httpBasic} with
- * {@code oauth2ResourceServer(jwt)}, delete
- * {@link #userDetailsService(SecurityProperties, PasswordEncoder)}, and map role
- * claims to authorities. The {@code @PreAuthorize} rules on the controllers are
- * written against role names, so they do not change at all.</p>
+ * {@code oauth2ResourceServer(jwt)}, delete both this configured store and
+ * {@link DatabaseUserDetailsService}, and map role claims to authorities. The
+ * {@code @PreAuthorize} rules on the controllers are written against role
+ * names, so they do not change at all.</p>
  *
  * <p>CSRF is disabled because this is a token-style stateless API with no
  * cookie-based session for a browser to replay - not because CSRF does not
@@ -55,7 +62,6 @@ public class SecurityConfig {
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().denyAll())
             .httpBasic(Customizer.withDefaults());
-
         return http.build();
     }
 
@@ -65,13 +71,22 @@ public class SecurityConfig {
     }
 
     /**
-     * Builds the development user store from configuration. Passwords are
-     * supplied in plaintext by configuration and hashed here, so no hash is
-     * committed to the repository and no plaintext is stored in memory.
+     * The break-glass accounts from configuration.
+     *
+     * <p>No longer the application's user store - it is the fallback consulted
+     * by {@link DatabaseUserDetailsService} for usernames the database does not
+     * contain. Passwords are supplied in plaintext by configuration and hashed
+     * here, so no hash is committed to the repository and no plaintext is held
+     * in memory.</p>
+     *
+     * <p>The bean is deliberately typed {@code InMemoryUserDetailsManager}
+     * rather than {@code UserDetailsService}: it must not be mistaken for the
+     * primary store, and {@link DatabaseUserDetailsService} injects it by that
+     * concrete type.</p>
      */
     @Bean
-    public InMemoryUserDetailsManager userDetailsService(SecurityProperties properties,
-                                                         PasswordEncoder passwordEncoder) {
+    public InMemoryUserDetailsManager configuredUsers(SecurityProperties properties,
+                                                      PasswordEncoder passwordEncoder) {
         List<UserDetails> users = properties.getUsers().stream()
                 .map(devUser -> (UserDetails) User.withUsername(devUser.getUsername())
                         .password(passwordEncoder.encode(devUser.getPassword()))
