@@ -1,0 +1,10 @@
+# Build inputs - not part of the served site.
+Dockerfile
+.dockerignore
+nginx.conf
+
+# Editor and OS noise.
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
