@@ -1,60 +1,80 @@
 /* ==========================================================================
    pages/login.js - Screen 1: Login
    --------------------------------------------------------------------------
-   Maps to CSC-09 Identity & Access. Production sign-in redirects to Microsoft
-   Entra ID (OIDC); the prototype selects one of the demo accounts so each
-   role's version of the application can be demonstrated.
+   Maps to CSC-09 Identity & Access.
+
+   Phase 1 signs in with a username and password, sent to the API as HTTP
+   Basic over HTTPS. The credential is validated by API.auth.signIn(), which
+   makes a real request before any session is stored - so a wrong password
+   fails here rather than on the first screen after the redirect.
+
+   Phase 3 replaces this form with a redirect to Microsoft Entra ID (OIDC).
+   The "Sign in with Microsoft" button is present but disabled so the intended
+   production path stays visible in the interface.
    ========================================================================== */
 
 (function () {
   'use strict';
 
-  var selected = 'usr-1002'; // Manager - the broadest read-only starting view
-
-  /* If a session already exists, skip the login screen. */
+  /* Already signed in - skip straight to the application. */
   if (window.Store.getSession()) {
     window.location.replace('dashboard.html');
     return;
   }
 
-  var DEMO_ACCOUNTS = window.MockData.USERS.filter(function (u) {
-    return ['usr-1001', 'usr-1002', 'usr-1003', 'usr-1004'].indexOf(u.userId) !== -1;
-  });
+  var form          = UI.qs('#loginForm');
+  var usernameInput = UI.qs('#username');
+  var passwordInput = UI.qs('#password');
+  var signInBtn     = UI.qs('#signInBtn');
 
-  function render() {
-    var picker = UI.qs('#rolePicker');
-    picker.innerHTML = DEMO_ACCOUNTS.map(function (u) {
-      var role = window.MockData.ROLES[u.role];
-      return '<button type="button" role="radio" class="role-option' + (u.userId === selected ? ' is-selected' : '')
-        + '" data-user="' + UI.esc(u.userId) + '" aria-checked="' + (u.userId === selected) + '">'
-        + '<span class="avatar" aria-hidden="true">' + UI.esc(UI.initials(u.name)) + '</span>'
-        + '<span><span class="role-option__name">' + UI.esc(role.name) + '</span>'
-        + '<span class="role-option__desc">' + UI.esc(u.name) + ' — ' + UI.esc(role.description) + '</span></span>'
-        + '</button>';
-    }).join('');
+  var busy = false;
 
-    UI.qsa('.role-option', picker).forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        selected = btn.dataset.user;
-        render();
-      });
-    });
+  function setBusy(state) {
+    busy = state;
+    signInBtn.disabled    = state;
+    signInBtn.textContent = state ? 'Signing in…' : 'Sign in';
+    usernameInput.disabled = state;
+    passwordInput.disabled = state;
   }
 
   function signIn() {
+    if (busy) { return; }
     UI.clearErrors(document);
-    var buttons = UI.qsa('#ssoBtn, #continueBtn');
-    buttons.forEach(function (b) { b.disabled = true; });
 
-    API.auth.signIn(selected)
-      .then(function () { window.location.href = 'dashboard.html'; })
+    var username = usernameInput.value.trim();
+    var password = passwordInput.value;
+
+    /* Checked here as well as in api.js so an empty field is reported
+       immediately, without a network round trip. */
+    if (!username) {
+      UI.handleApiError(new API.ApiError(400, 'Enter your username.', 'username'), document);
+      return;
+    }
+    if (!password) {
+      UI.handleApiError(new API.ApiError(400, 'Enter your password.', 'password'), document);
+      return;
+    }
+
+    setBusy(true);
+
+    API.auth.signIn(username, password)
+      .then(function () {
+        window.location.href = 'dashboard.html';
+      })
       .catch(function (err) {
-        UI.showFormError(err.message, document);
-        buttons.forEach(function (b) { b.disabled = false; });
+        setBusy(false);
+        /* Clear the password but keep the username: a mistyped password is the
+           common case, and retyping both is needless friction. */
+        passwordInput.value = '';
+        UI.handleApiError(err, document);
+        passwordInput.focus();
       });
   }
 
-  render();
-  UI.qs('#ssoBtn').addEventListener('click', signIn);
-  UI.qs('#continueBtn').addEventListener('click', signIn);
+  form.addEventListener('submit', function (event) {
+    event.preventDefault();
+    signIn();
+  });
+
+  usernameInput.focus();
 })();

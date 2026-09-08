@@ -36,23 +36,26 @@
   var API_BASE = 'https://inventory-api-173479193959.us-west2.run.app';
 
   /**
-   * Phase 1 demo credential.
+   * Role shown in the UI for each Phase 1 account.
    *
-   * The backend uses HTTP Basic against an in-memory user store; the login
-   * screen is a role picker with no password field, so the password lives here.
-   * That means it is visible to anyone who opens devtools or reads this file.
-   * Acceptable for a classroom demo against a throwaway database; it is NOT a
-   * production pattern. When Entra ID / OIDC lands (Phase 3), this constant and
-   * the USER_MAP below are deleted and replaced by a token from the OIDC flow.
+   * The backend has no user-profile endpoint yet, so after a successful sign-in
+   * there is no way to ask the API "what role am I?". These usernames come from
+   * app.security.users in application.yml and their roles are fixed, so the
+   * mapping is exact for them.
+   *
+   * This only decides which menu items and buttons the UI shows. Real
+   * authorization is enforced server-side by @PreAuthorize, so an unknown
+   * username getting the conservative default below can still read what its
+   * role permits and will receive a 403 for anything it may not do.
+   *
+   * Phase 3 note: when Entra ID / OIDC replaces HTTP Basic, the role comes from
+   * a token claim and this map is deleted.
    */
-  var DEMO_PASSWORD = 'CalSolar123@';
-
-  /** Prototype demo accounts -> backend usernames (application.yml app.security.users). */
-  var USER_MAP = {
-    'usr-1001': 'field',
-    'usr-1002': 'manager',
-    'usr-1003': 'finance',
-    'usr-1004': 'admin'
+  var ROLE_BY_USERNAME = {
+    'field': 'FIELD',
+    'manager': 'MANAGER',
+    'finance': 'FINANCE',
+    'admin': 'ADMIN'
   };
 
   /** Page size used for screens that render a full list rather than paging. */
@@ -211,30 +214,60 @@
   }
 
   /* ================================================================= AUTH */
-  /* LIVE. The prototype's role picker passes a demo userId; that maps to a
-     backend username and the credential is validated by calling a real
-     endpoint. A 200 means the account works and the role guards will pass. */
+  /* LIVE. The backend uses HTTP Basic, so "signing in" means proving the
+     credential works and then keeping it for subsequent requests. There is no
+     session endpoint and no token to obtain - GET /api/locations is called as
+     a cheap, read-only probe that every role is permitted to make. */
+
+  /** Finds a demo display profile for a role, so the UI can show a name. */
+  function profileForRole(role) {
+    var users = (global.MockData && global.MockData.USERS) || [];
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].role === role) { return users[i]; }
+    }
+    return null;
+  }
 
   var auth = {
-    /** Validates against GET /api/locations, then stores the Basic credential. */
-    signIn: function (userId, password) {
-      var username = USER_MAP[userId];
+    /**
+     * Validates username + password against the API, then stores the
+     * credential on the session so every later request can send it.
+     *
+     * The credential is held in sessionStorage via Store, which means it is
+     * gone when the tab closes and never written to localStorage. It is still
+     * readable by any script on this origin - acceptable for Basic auth in
+     * Phase 1, and the reason Phase 3 moves to a short-lived OIDC token.
+     */
+    signIn: function (username, password) {
+      username = String(username || '').trim();
+      password = String(password == null ? '' : password);
+
       if (!username) {
-        return Promise.reject(new ApiError(404, 'Account not found.'));
+        return Promise.reject(new ApiError(400, 'Enter your username.', 'username'));
       }
-      var basic = global.btoa(username + ':' + (password || DEMO_PASSWORD));
+      if (!password) {
+        return Promise.reject(new ApiError(400, 'Enter your password.', 'password'));
+      }
+
+      var basic;
+      try {
+        /* btoa handles Latin-1 only; encodeURIComponent/unescape widens it so a
+           non-ASCII password does not throw before it reaches the server. */
+        basic = global.btoa(unescape(encodeURIComponent(username + ':' + password)));
+      } catch (e) {
+        return Promise.reject(new ApiError(400, 'That username or password contains characters the browser cannot encode.'));
+      }
 
       return http('GET', '/api/locations', null, null, 'Basic ' + basic)
         .then(function () {
-          /* The demo profile (display name, site, employeeId) still comes from
-             MockData - the backend has no user-profile endpoint in Phase 1. */
-          var profile = byId(global.MockData.USERS, 'userId', userId) || {};
+          var role = ROLE_BY_USERNAME[username.toLowerCase()] || 'FIELD';
+          var profile = profileForRole(role) || {};
           var session = {
-            userId: userId,
+            userId: profile.userId || username,
             username: username,
             name: profile.name || username,
             email: profile.email || '',
-            role: profile.role || username.toUpperCase(),
+            role: role,
             employeeId: profile.employeeId || null,
             site: profile.site || '',
             signedInAt: nowIso(),
@@ -246,7 +279,10 @@
         })
         .catch(function (err) {
           if (err.status === 401) {
-            throw new ApiError(401, 'Sign-in failed. The demo password in api.js may be out of date.');
+            throw new ApiError(401, 'Incorrect username or password.', 'password');
+          }
+          if (err.status === 403) {
+            throw new ApiError(403, 'That account is not permitted to use this application.');
           }
           throw err;
         });

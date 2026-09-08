@@ -44,27 +44,52 @@
       </div>
 
       <h2 style="margin-bottom:4px">Sign in</h2>
-      <p class="small muted">Use your organization account to continue.</p>
+      <p class="small muted">Use your Cloud Inventory account to continue.</p>
 
       <div id="formBanner" class="mb-4" style="margin-top:16px"></div>
 
-      <button class="btn btn--primary btn--block btn--lg" type="button" id="ssoBtn">
+      <!-- Credentials are sent as HTTP Basic to the API over HTTPS. The form
+           never posts: login.js intercepts submit and calls API.auth.signIn. -->
+      <form id="loginForm" novalidate>
+        <div class="field field--full mb-4">
+          <label class="field__label" for="username">
+            Username<span class="req" aria-hidden="true">*</span>
+          </label>
+          <input type="text" id="username" name="username"
+                 autocomplete="username" autocapitalize="none"
+                 autocorrect="off" spellcheck="false" required>
+          <div class="field__error"></div>
+        </div>
+
+        <div class="field field--full mb-4">
+          <label class="field__label" for="password">
+            Password<span class="req" aria-hidden="true">*</span>
+          </label>
+          <input type="password" id="password" name="password"
+                 autocomplete="current-password" required>
+          <div class="field__error"></div>
+        </div>
+
+        <button class="btn btn--primary btn--block btn--lg" type="submit" id="signInBtn">
+          Sign in
+        </button>
+      </form>
+
+      <div class="divider">Single sign-on</div>
+
+      <button class="btn btn--block" type="button" id="ssoBtn" disabled
+              title="Available in Phase 3">
         <span aria-hidden="true">⊞</span> Sign in with Microsoft
       </button>
       <p class="xsmall subtle" style="margin-top:8px">
-        Production authentication is delegated to Microsoft Entra ID using OpenID Connect.
-        In this prototype the button selects the highlighted demo account.
+        Microsoft Entra ID (OpenID Connect) is Phase 3 — CSC-09. Until then, sign
+        in with a Cloud Inventory account above.
       </p>
 
-      <div class="divider">Prototype demo accounts</div>
-
-      <div class="role-picker" id="rolePicker" role="radiogroup" aria-label="Choose a demo account"></div>
-
-      <button class="btn btn--block mt-4" type="button" id="continueBtn">Continue as selected account</button>
-
       <p class="prototype-note">
-        Front-end prototype — no backend, no network calls, and no credentials are collected.
-        Sample data lives in <code>js/data.js</code> and resets when you close the tab.
+        Phase 1 accounts are <code>field</code>, <code>manager</code>,
+        <code>finance</code> and <code>admin</code>. Each sees only the screens
+        and actions its role permits, enforced by the API.
       </p>
     </div>
   </main>
