@@ -161,18 +161,54 @@
       + '<div class="dl__val">' + UI.esc(value) + '</div></div>';
   }
 
+  /**
+   * Describes what is wrong with the quantity box, or null when it is usable.
+   *
+   * Separate from currentDelta() so the preview and the submit handler can
+   * share one definition of "valid" while reporting it differently.
+   */
+  function amountProblem() {
+    var raw = UI.qs('#amount').value.trim();
+    if (raw === '') { return 'Enter an adjustment quantity.'; }
+
+    var amount = Number(raw);
+    if (!isFinite(amount)) { return 'Enter a number.'; }
+    if (amount <= 0) { return 'Enter a quantity greater than zero.'; }
+
+    /* Stock is counted, not measured - a fraction here is always a typo, most
+       often a stray decimal point. The API and the database refuse it too;
+       catching it in the box just makes the answer immediate. */
+    if (Math.floor(amount) !== amount) {
+      return 'Whole units only — stock cannot be adjusted by a fraction.';
+    }
+    return null;
+  }
+
   function currentDelta() {
-    var amount = Number(UI.qs('#amount').value);
-    var dir = Number(UI.qs('#direction').value);
-    if (!isFinite(amount) || amount <= 0) { return null; }
-    return dir * amount;
+    if (amountProblem() !== null) { return null; }
+    return Number(UI.qs('#direction').value) * Number(UI.qs('#amount').value);
   }
 
   /** Live preview - shows the resulting balance and blocks negative stock. */
   function renderPreview() {
     var host = UI.qs('#preview');
+    if (!selected) { host.innerHTML = ''; return; }
+
+    /* A fraction is called out as soon as it is typed rather than waiting for
+       submit. Anything else wrong with the box - empty, zero, mid-type - stays
+       quiet, because those are all states you pass through on the way to a
+       valid entry. */
+    var raw = UI.qs('#amount').value.trim();
+    if (raw !== '' && isFinite(Number(raw)) && Math.floor(Number(raw)) !== Number(raw)) {
+      host.innerHTML = '<div class="alert alert--danger"><span class="alert__icon" aria-hidden="true">✕</span>'
+        + '<div class="alert__body"><div class="alert__title">Whole units only</div>'
+        + 'Stock is counted in whole ' + UI.esc(selected.uom) + ', so it cannot be adjusted by '
+        + 'a fraction. Enter a whole number.</div></div>';
+      return;
+    }
+
     var delta = currentDelta();
-    if (!selected || delta === null) { host.innerHTML = ''; return; }
+    if (delta === null) { host.innerHTML = ''; return; }
 
     var after = selected.quantityOnHand + delta;
 
@@ -212,8 +248,9 @@
 
     if (!selected) { return fieldError('itemId', 'Select the inventory item to adjust.'); }
 
+    var problem = amountProblem();
+    if (problem !== null) { return fieldError('amount', problem); }
     var delta = currentDelta();
-    if (delta === null) { return fieldError('amount', 'Enter an adjustment quantity greater than zero.'); }
 
     var reason = UI.qs('#reason').value;
     if (!reason) { return fieldError('reason', 'An adjustment reason is required.'); }

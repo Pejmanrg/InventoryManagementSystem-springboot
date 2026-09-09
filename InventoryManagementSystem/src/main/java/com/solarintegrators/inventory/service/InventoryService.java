@@ -65,6 +65,7 @@ public class InventoryService {
         }
 
         BigDecimal initial = request.initialQuantity() == null ? BigDecimal.ZERO : request.initialQuantity();
+        requireWholeUnits(initial, "initialQuantity", "Initial quantity");
         if (initial.compareTo(BigDecimal.ZERO) < 0) {
             throw new InvalidRequestException("INVENTORY_NEGATIVE_INITIAL", "initialQuantity",
                     "Initial quantity cannot be negative.");
@@ -75,7 +76,9 @@ public class InventoryService {
         InventoryItem item = new InventoryItem(sku, request.description(), initial, location);
         item.setCategory(request.category());
         item.setUnitOfMeasure(request.unitOfMeasure());
-        item.setReorderPoint(request.reorderPoint() == null ? BigDecimal.ZERO : request.reorderPoint());
+        BigDecimal reorder = request.reorderPoint() == null ? BigDecimal.ZERO : request.reorderPoint();
+        requireWholeUnits(reorder, "reorderPoint", "Reorder point");
+        item.setReorderPoint(reorder);
         item.setUnitCost(request.unitCost());
         item.setLastCountedAt(Instant.now());
 
@@ -132,6 +135,7 @@ public class InventoryService {
             throw InvalidRequestException.required("delta", "An adjustment quantity is required.");
         }
         BigDecimal delta = request.delta();
+        requireWholeUnits(delta, "delta", "Adjustment quantity");
         if (delta.compareTo(BigDecimal.ZERO) == 0) {
             throw new InvalidRequestException("INVENTORY_ZERO_DELTA", "delta",
                     "Enter an adjustment quantity other than zero.");
@@ -169,6 +173,30 @@ public class InventoryService {
     }
 
     /* ------------------------------------------------------------------ */
+
+    /**
+     * Refuses a fractional quantity.
+     *
+     * <p>Stock is counted, not measured. Half a connector cannot be issued to a
+     * job, and a fractional balance never reconciles against a physical count,
+     * so a fraction arriving here is an entry error every time.</p>
+     *
+     * <p>Enforced in the service rather than as {@code @Digits} on the request,
+     * because {@code @Digits(fraction = 0)} rejects {@code 10.0} - a caller
+     * whose JSON serialiser writes a trailing zero would be refused over
+     * formatting rather than over the rule. {@code stripTrailingZeros} first
+     * makes {@code 10.0} and {@code 10} the same number, which they are.</p>
+     *
+     * <p>The database repeats this check. Validation here produces the readable
+     * message; the constraint is what holds when a row is written by some route
+     * that never passes through this method.</p>
+     */
+    private static void requireWholeUnits(BigDecimal value, String field, String label) {
+        if (value != null && value.stripTrailingZeros().scale() > 0) {
+            throw new InvalidRequestException("QUANTITY_NOT_WHOLE", field,
+                    label + " must be a whole number - stock is counted in whole units.");
+        }
+    }
 
     private InventoryItem requireItem(UUID itemId) {
         return inventoryRepository.findById(itemId)

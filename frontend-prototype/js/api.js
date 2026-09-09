@@ -513,6 +513,13 @@
       if (!isFinite(d) || d === 0) {
         return Promise.reject(new ApiError(400, 'Enter an adjustment quantity other than zero.', 'delta'));
       }
+      /* Stock is counted in whole units. The server refuses this as well and
+         the database constraint refuses it after that; checking here saves a
+         round trip and keeps any future caller of this layer honest. */
+      if (Math.floor(d) !== d) {
+        return Promise.reject(new ApiError(400,
+          'Stock is counted in whole units - an adjustment cannot be a fraction.', 'delta'));
+      }
       if (!meta.reason) {
         return Promise.reject(new ApiError(400, 'An adjustment reason is required.', 'reason'));
       }
