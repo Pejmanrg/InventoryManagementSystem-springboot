@@ -3,7 +3,6 @@ package com.solarintegrators.inventory.dto.response;
 import com.solarintegrators.inventory.model.Location;
 import java.util.UUID;
 
-/** API view of a {@link Location}. */
 public record LocationResponse(
         UUID locationId,
         String code,
@@ -11,7 +10,6 @@ public record LocationResponse(
         String type,
         String address,
         boolean active) {
-
     public static LocationResponse from(Location location) {
         if (location == null) {
             return null;

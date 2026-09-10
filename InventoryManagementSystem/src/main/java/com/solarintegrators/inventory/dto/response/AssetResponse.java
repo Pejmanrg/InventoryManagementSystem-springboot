@@ -7,13 +7,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * API view of an {@link Asset}.
- *
- * <p>Associations are flattened to identifier plus display name so a client can
- * render a row without a second request, and so the JSON shape stays stable if
- * the entity mapping changes.</p>
- */
 public record AssetResponse(
         UUID assetId,
         String tag,
@@ -33,8 +26,6 @@ public record AssetResponse(
         Instant lastTransactionAt,
         Instant createdAt,
         Instant updatedAt) {
-
-    /** Must be called inside the transaction: it reads the lazy associations. */
     public static AssetResponse from(Asset asset) {
         return new AssetResponse(
                 asset.getAssetId(),

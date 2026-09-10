@@ -21,19 +21,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import java.math.BigDecimal;
+import org.springframework.web.bind.annotation.PutMapping;
 
-/** Quantity-managed stock. */
 @RestController
 @RequestMapping("/api/inventory")
 public class InventoryController {
-
     private final InventoryService inventoryService;
 
     public InventoryController(InventoryService inventoryService) {
         this.inventoryService = inventoryService;
     }
 
-    /** GET /api/inventory - filtered, paged list. {@code lowStockOnly=true} drives the reorder report. */
     @GetMapping
     @PreAuthorize("hasAnyRole('FIELD','MANAGER','FINANCE','ADMIN')")
     public PageResponse<InventoryItemResponse> listItems(
@@ -42,18 +41,15 @@ public class InventoryController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Boolean lowStockOnly,
             @PageableDefault(size = 25, sort = "sku", direction = Sort.Direction.ASC) Pageable pageable) {
-
         return inventoryService.listItems(query, locationId, category, lowStockOnly, pageable);
     }
 
-    /** GET /api/inventory/{id} */
     @GetMapping("/{itemId}")
     @PreAuthorize("hasAnyRole('FIELD','MANAGER','FINANCE','ADMIN')")
     public InventoryItemResponse getItem(@PathVariable UUID itemId) {
         return inventoryService.getItem(itemId);
     }
 
-    /** POST /api/inventory */
     @PostMapping
     @PreAuthorize("hasAnyRole('FIELD','MANAGER','FINANCE','ADMIN')")
     public ResponseEntity<InventoryItemResponse> createItem(
@@ -64,12 +60,13 @@ public class InventoryController {
                 .body(created);
     }
 
-    /**
-     * POST /api/inventory/{id}/adjust - applies a signed quantity change.
-     *
-     * <p>409 with code {@code INVENTORY_NEGATIVE_STOCK} when the result would be
-     * below zero; nothing is written in that case.</p>
-     */
+    @PutMapping("/{itemId}/threshold")
+    @PreAuthorize("hasAnyRole('MANAGER','FINANCE','ADMIN')")
+    public InventoryItemResponse setThreshold(@PathVariable UUID itemId,
+                                              @RequestParam BigDecimal reorderPoint) {
+        return inventoryService.setThreshold(itemId, reorderPoint);
+    }
+
     @PostMapping("/{itemId}/adjust")
     @PreAuthorize("hasAnyRole('FIELD','MANAGER','ADMIN')")
     public AdjustmentResponse adjustQuantity(@PathVariable UUID itemId,

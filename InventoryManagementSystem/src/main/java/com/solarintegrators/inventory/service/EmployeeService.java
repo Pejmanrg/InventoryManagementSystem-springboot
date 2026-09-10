@@ -17,22 +17,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Employees that assets can be assigned to.
- *
- * <p>Maintained by hand in Phase 1. When the HR integration is built (CSC-13)
- * this becomes a projection of the HR platform, matched on
- * {@code externalHrId}; that column exists now so records created today can be
- * reconciled later without a migration.</p>
- *
- * <p>Assets are assigned to employees through the check-out workflow rather than
- * by editing an employee, so every assignment produces a transaction record.
- * {@link #getAssignedAssets} is the read side of that relationship.</p>
- */
 @Service
 @Transactional
 public class EmployeeService {
-
     private final EmployeeRepository employeeRepository;
     private final LocationRepository locationRepository;
     private final AssetRepository assetRepository;
@@ -71,7 +58,7 @@ public class EmployeeService {
         employee.setExternalHrId(trimToNull(request.externalHrId()));
 
         Employee saved = employeeRepository.save(employee);
-        auditService.record("EMPLOYEE_CREATE", "EMPLOYEE", saved.getEmployeeId(),
+        auditService.recordEvent("EMPLOYEE_CREATE", "EMPLOYEE", saved.getEmployeeId(),
                 "Employee " + saved.getName() + " created.");
         return EmployeeResponse.from(saved);
     }
@@ -90,7 +77,6 @@ public class EmployeeService {
                 .orElseThrow(() -> ResourceNotFoundException.employee(employeeId));
     }
 
-    /** Every asset currently in this employee's custody. */
     @Transactional(readOnly = true)
     public List<AssetResponse> getAssignedAssets(UUID employeeId) {
         if (!employeeRepository.existsById(employeeId)) {

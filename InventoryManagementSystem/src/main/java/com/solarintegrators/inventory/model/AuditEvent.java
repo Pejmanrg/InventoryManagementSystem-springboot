@@ -11,20 +11,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * A record of who did what, to which record, and when.
- *
- * <p>Rejected attempts are stored with outcome {@link AuditOutcome#DENIED} as
- * well as successful ones. A log that only records what succeeded cannot answer
- * "did someone try?", which is the question the repudiation and elevation-of-
- * privilege rows of the SDD threat model care about.</p>
- *
- * <p>Append-only, like {@link AssetTransaction}: no setters, no update path.</p>
- */
 @Entity
 @Table(name = "audit_events")
 public class AuditEvent {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "event_id", nullable = false, updatable = false)
@@ -33,22 +22,15 @@ public class AuditEvent {
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;
 
-    /** Username of the actor, or "system" for scheduled and integration jobs. */
     @Column(name = "actor", nullable = false, length = 120, updatable = false)
     private String actor;
 
-    /** ASSET_CHECKOUT, INVENTORY_ADJUST, ROLE_ASSIGN, and similar. */
     @Column(name = "action", nullable = false, length = 64, updatable = false)
     private String action;
 
     @Column(name = "entity_type", nullable = false, length = 32, updatable = false)
     private String entityType;
 
-    /**
-     * Identifier of the affected record. Held as text rather than UUID because
-     * some audited actions refer to batches and external references that are
-     * not database keys.
-     */
     @Column(name = "entity_id", length = 64, updatable = false)
     private String entityId;
 

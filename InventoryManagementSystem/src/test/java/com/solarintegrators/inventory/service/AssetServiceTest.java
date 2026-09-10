@@ -19,15 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
 
-/**
- * Asset creation, search, and editing.
- *
- * <p>Covers test case TC-01 (create), TC-02 (search), and TC-07 (duplicate tag)
- * from the SDD test plan - the last of which the design document lists as
- * "Pending: dedicated duplicate-tag test still required".</p>
- */
 class AssetServiceTest extends AbstractIntegrationTest {
-
     @Test
     @DisplayName("TC-01: a new asset is created AVAILABLE with no custodian")
     void createsAssetInAvailableState() {

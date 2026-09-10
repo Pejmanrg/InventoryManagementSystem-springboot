@@ -7,7 +7,7 @@ import com.solarintegrators.inventory.dto.response.InvitationIssuedResponse;
 import com.solarintegrators.inventory.dto.response.UserResponse;
 import com.solarintegrators.inventory.model.InvitationPurpose;
 import com.solarintegrators.inventory.model.UserRole;
-import com.solarintegrators.inventory.service.AppUserService;
+import com.solarintegrators.inventory.service.UserRoleService;
 import com.solarintegrators.inventory.service.InvitationService;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -27,64 +27,30 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Account administration (CSC-09 Identity &amp; Access).
- *
- * <p>Every endpoint here is ADMIN-only, without exception. Unlike the asset and
- * inventory controllers - where FIELD and MANAGER share most reads - there is
- * no read that is safe to widen: the list alone tells a caller which accounts
- * exist and which of them hold ADMIN, which is reconnaissance rather than
- * information a warehouse user needs.</p>
- *
- * <p>Phase 3 note: when Microsoft Entra ID becomes the identity provider,
- * account creation and deactivation move to the directory and this controller
- * narrows to the application-side profile - role and job title - rather than
- * disappearing entirely.</p>
- */
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
-
-    private final AppUserService appUserService;
+    private final UserRoleService userRoleService;
     private final InvitationService invitationService;
 
-    public UserController(AppUserService appUserService, InvitationService invitationService) {
-        this.appUserService = appUserService;
+    public UserController(UserRoleService userRoleService, InvitationService invitationService) {
+        this.userRoleService = userRoleService;
         this.invitationService = invitationService;
     }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> listUsers() {
-        return appUserService.listUsers();
+        return userRoleService.listUsers();
     }
 
-    /**
-     * The signed-in account's own profile.
-     *
-     * <p>Authenticated rather than ADMIN-only, and deliberately so: this is how
-     * the interface discovers which role it is running as, and every role needs
-     * that. It returns only the caller's own record, so it discloses nothing the
-     * caller did not already supply to sign in.</p>
-     *
-     * <p>A configured break-glass account has no row in {@code app_users}.
-     * Returning 404 there would make the interface treat a valid sign-in as a
-     * failure, so the role is instead read back from the granted authority and
-     * returned with a null {@code userId} - which is also the marker that the
-     * profile cannot be edited here, because it lives in configuration.</p>
-     *
-     * <p>Mapped before {@code /{userId}} by pattern specificity: a literal
-     * segment outranks a variable one, so {@code me} never reaches the UUID
-     * converter.</p>
-     */
     @GetMapping("/me")
     public UserResponse currentUser(Authentication authentication) {
         String username = authentication.getName();
-        return appUserService.findByUsername(username)
+        return userRoleService.findByUsername(username)
                 .orElseGet(() -> UserResponse.breakGlass(username, roleOf(authentication)));
     }
 
-    /** Reads the role back out of the granted authorities: ROLE_ADMIN -> ADMIN. */
     private static UserRole roleOf(Authentication authentication) {
         for (GrantedAuthority granted : authentication.getAuthorities()) {
             String authority = granted.getAuthority();
@@ -92,7 +58,6 @@ public class UserController {
                 try {
                     return UserRole.valueOf(authority.substring("ROLE_".length()));
                 } catch (IllegalArgumentException ignored) {
-                    /* Not one of the four roles - keep looking rather than fail. */
                 }
             }
         }
@@ -102,13 +67,13 @@ public class UserController {
     @GetMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponse getUser(@PathVariable UUID userId) {
-        return appUserService.getUser(userId);
+        return userRoleService.getUser(userId);
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
-        UserResponse created = appUserService.createUser(request);
+        UserResponse created = userRoleService.createUser(request);
         return ResponseEntity.created(URI.create("/api/users/" + created.userId())).body(created);
     }
 
@@ -116,20 +81,9 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponse updateUser(@PathVariable UUID userId,
                                    @Valid @RequestBody UpdateUserRequest request) {
-        return appUserService.updateUser(userId, request);
+        return userRoleService.updateUser(userId, request);
     }
 
-    /**
-     * Emails a single-use link so the account holder can set their own password.
-     *
-     * <p>The same endpoint serves both an initial invitation and a later reset -
-     * they differ only in wording and lifetime - and re-sending is simply
-     * calling it again, which supersedes any outstanding link.</p>
-     *
-     * <p>Prefer this to {@code /reset-password} below. This route is the only
-     * one where the password is known solely to its owner; the other requires
-     * an administrator to choose it and then get it to them somehow.</p>
-     */
     @PostMapping("/{userId}/invite")
     @PreAuthorize("hasRole('ADMIN')")
     public InvitationIssuedResponse invite(
@@ -138,34 +92,18 @@ public class UserController {
         return invitationService.issue(userId, purpose);
     }
 
-    /**
-     * Sets a new password directly. Returns 204 rather than the user, so that no
-     * part of a password-changing response can be mistaken for the credential.
-     *
-     * <p>Kept for the case with no working mailbox - a shared warehouse account,
-     * someone whose email is not yet provisioned. {@code /invite} is the better
-     * route whenever it is available.</p>
-     */
     @PostMapping("/{userId}/reset-password")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> resetPassword(@PathVariable UUID userId,
                                               @Valid @RequestBody ResetPasswordRequest request) {
-        appUserService.resetPassword(userId, request);
+        userRoleService.resetPassword(userId, request);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Permanently removes an account.
-     *
-     * <p>The audit trail records the actor by username as free text, so deleting
-     * an account does not orphan its history. Deactivating is still the better
-     * habit - {@code PUT} with {@code active: false} - and the service refuses
-     * to delete the last remaining administrator either way.</p>
-     */
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable UUID userId) {
-        appUserService.deleteUser(userId);
+        userRoleService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
 }

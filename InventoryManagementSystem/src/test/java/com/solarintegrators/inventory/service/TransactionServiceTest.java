@@ -23,15 +23,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Asset lifecycle transitions and history.
- *
- * <p>Covers TC-03 (checkout), TC-04 (check-in), TC-05 (history), TC-08
- * (checkout of an already checked-out asset) and TC-10 (checkout with no
- * employee). TC-08 and TC-10 are the two the SDD lists as pending.</p>
- */
 class TransactionServiceTest extends AbstractIntegrationTest {
-
     @Test
     @DisplayName("TC-03: checkout assigns the custodian and sets CHECKED_OUT")
     void checksOutAvailableAsset() {
@@ -212,7 +204,7 @@ class TransactionServiceTest extends AbstractIntegrationTest {
         AssetResponse asset = givenAvailableAsset(warehouse);
         transactionService.checkOut(asset.assetId(), new CheckoutRequest(technician.employeeId(), null, null));
 
-        AssetResponse moved = transactionService.move(asset.assetId(),
+        AssetResponse moved = transactionService.moveAsset(asset.assetId(),
                 new MoveAssetRequest(van.locationId(), "Transferred to Van 12."));
 
         assertThat(moved.locationName()).isEqualTo("Van 12 (Mobile)");
@@ -273,14 +265,14 @@ class TransactionServiceTest extends AbstractIntegrationTest {
         LocationResponse warehouse = givenWarehouse();
         AssetResponse asset = givenAvailableAsset(warehouse);
 
-        AssetResponse retired = transactionService.retire(asset.assetId(),
+        AssetResponse retired = transactionService.dispose(asset.assetId(),
                 new StatusChangeRequest(null, "E-waste certificate EW-88213."));
 
         assertThat(retired.status()).isEqualTo(AssetStatus.RETIRED);
         assertThat(transactionService.getHistory(asset.assetId()).get(0).type())
                 .isEqualTo(TransactionType.DISPOSE);
 
-        assertThatThrownBy(() -> transactionService.retire(asset.assetId(),
+        assertThatThrownBy(() -> transactionService.dispose(asset.assetId(),
                 new StatusChangeRequest(null, null)))
                 .isInstanceOf(InvalidAssetStateException.class);
     }
@@ -293,7 +285,7 @@ class TransactionServiceTest extends AbstractIntegrationTest {
         AssetResponse asset = givenAvailableAsset(warehouse);
         transactionService.checkOut(asset.assetId(), new CheckoutRequest(technician.employeeId(), null, null));
 
-        assertThatThrownBy(() -> transactionService.retire(asset.assetId(),
+        assertThatThrownBy(() -> transactionService.dispose(asset.assetId(),
                 new StatusChangeRequest(null, null)))
                 .isInstanceOf(InvalidAssetStateException.class);
 

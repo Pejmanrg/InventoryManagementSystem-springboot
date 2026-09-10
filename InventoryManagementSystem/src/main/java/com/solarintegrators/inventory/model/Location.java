@@ -9,13 +9,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * A place an asset or stock can be: warehouse, yard, vehicle, job site, office.
- */
 @Entity
 @Table(name = "locations")
 public class Location {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "location_id", nullable = false, updatable = false)

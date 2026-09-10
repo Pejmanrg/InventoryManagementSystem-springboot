@@ -1,10 +1,3 @@
-/* ==========================================================================
-   pages/assets.js - Screen 3: Assets list
-   --------------------------------------------------------------------------
-   Maps to AssetService.searchAssets() / AssetRepository.search() (CSC-03).
-   Search, status / location / category filters, sortable columns, and a
-   mocked authorized export (ExportService.exportFiltered(), CSC-08).
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -55,8 +48,6 @@
     return '<div class="field ' + (extra || '') + '">'
       + '<label class="field__label">' + UI.esc(label) + '</label>' + control + '</div>';
   }
-
-  /* --------------------------------------------------------------- load */
 
   function load() {
     UI.qs('#tableHost').innerHTML = UI.loading('Loading assets…');
@@ -148,8 +139,6 @@
     }
     return '<a class="btn btn--sm" href="asset-detail.html?id=' + UI.esc(a.assetId) + '">Open</a>';
   }
-
-  /* ------------------------------------------------------------ filters */
 
   function syncFromForm() {
     filters.query = UI.qs('#fQuery').value;

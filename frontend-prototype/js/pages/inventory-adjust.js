@@ -1,11 +1,3 @@
-/* ==========================================================================
-   pages/inventory-adjust.js - Screen 9: Inventory adjustment
-   --------------------------------------------------------------------------
-   Maps to InventoryService.adjustQuantity() (CSC-03). The screen shows the
-   resulting quantity before anything is committed and blocks a change that
-   would drive stock below zero - the same guard the service enforces
-   (requirement REQ-INV-02, test case TC-09).
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -60,8 +52,6 @@
     UI.qs('#formHost').innerHTML = '<div class="alert alert--danger"><div class="alert__body">'
       + UI.esc(err.message) + '</div></div>';
   });
-
-  /* ---------------------------------------------------------------- form */
 
   function renderForm() {
     UI.qs('#formHost').innerHTML = ''
@@ -161,12 +151,6 @@
       + '<div class="dl__val">' + UI.esc(value) + '</div></div>';
   }
 
-  /**
-   * Describes what is wrong with the quantity box, or null when it is usable.
-   *
-   * Separate from currentDelta() so the preview and the submit handler can
-   * share one definition of "valid" while reporting it differently.
-   */
   function amountProblem() {
     var raw = UI.qs('#amount').value.trim();
     if (raw === '') { return 'Enter an adjustment quantity.'; }
@@ -175,9 +159,6 @@
     if (!isFinite(amount)) { return 'Enter a number.'; }
     if (amount <= 0) { return 'Enter a quantity greater than zero.'; }
 
-    /* Stock is counted, not measured - a fraction here is always a typo, most
-       often a stray decimal point. The API and the database refuse it too;
-       catching it in the box just makes the answer immediate. */
     if (Math.floor(amount) !== amount) {
       return 'Whole units only — stock cannot be adjusted by a fraction.';
     }
@@ -189,15 +170,10 @@
     return Number(UI.qs('#direction').value) * Number(UI.qs('#amount').value);
   }
 
-  /** Live preview - shows the resulting balance and blocks negative stock. */
   function renderPreview() {
     var host = UI.qs('#preview');
     if (!selected) { host.innerHTML = ''; return; }
 
-    /* A fraction is called out as soon as it is typed rather than waiting for
-       submit. Anything else wrong with the box - empty, zero, mid-type - stays
-       quiet, because those are all states you pass through on the way to a
-       valid entry. */
     var raw = UI.qs('#amount').value.trim();
     if (raw !== '' && isFinite(Number(raw)) && Math.floor(Number(raw)) !== Number(raw)) {
       host.innerHTML = '<div class="alert alert--danger"><span class="alert__icon" aria-hidden="true">✕</span>'
@@ -231,8 +207,6 @@
             + UI.fmtNumber(selected.reorderPoint) + '.' : '.'))
       + '</div></div>';
   }
-
-  /* -------------------------------------------------------------- submit */
 
   function fieldError(id, message) {
     var el = UI.qs('#' + id);
@@ -308,8 +282,6 @@
       });
     });
   }
-
-  /* ------------------------------------------------------------- recent */
 
   function renderRecent(list) {
     UI.qs('#recentHost').innerHTML = list.length

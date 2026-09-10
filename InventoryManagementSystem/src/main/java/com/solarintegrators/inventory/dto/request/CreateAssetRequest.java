@@ -7,14 +7,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * Payload for POST /api/assets.
- *
- * <p>The two rules the console prototype enforced by hand - tag required, name
- * required - are declared here so the framework rejects the request before it
- * reaches the service, and the service still checks them so the rule holds for
- * any other caller.</p>
- */
 public record CreateAssetRequest(
         @NotBlank(message = "Asset tag is required.")
         @Size(max = 64, message = "Asset tag must be 64 characters or fewer.")

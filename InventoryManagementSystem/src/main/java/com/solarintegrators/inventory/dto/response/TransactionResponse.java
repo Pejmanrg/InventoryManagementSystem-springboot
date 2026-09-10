@@ -6,7 +6,6 @@ import com.solarintegrators.inventory.model.TransactionType;
 import java.time.Instant;
 import java.util.UUID;
 
-/** API view of an {@link AssetTransaction} - one row of an asset's history. */
 public record TransactionResponse(
         UUID transactionId,
         UUID assetId,
@@ -21,8 +20,6 @@ public record TransactionResponse(
         Instant timestamp,
         String notes,
         String performedBy) {
-
-    /** Must be called inside the transaction: it reads the lazy associations. */
     public static TransactionResponse from(AssetTransaction transaction) {
         return new TransactionResponse(
                 transaction.getTransactionId(),

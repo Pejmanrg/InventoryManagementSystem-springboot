@@ -1,23 +1,6 @@
-/* ==========================================================================
-   data.js - Mock dataset for the front-end prototype
-   --------------------------------------------------------------------------
-   PROTOTYPE ONLY. Every object in this file is shaped like the JSON payload
-   the future Spring Boot REST API is expected to return, so the mock layer in
-   api.js can be swapped for real `fetch()` calls without changing any screen.
-
-   Field names deliberately mirror the Java domain model in
-   com.solarintegrators.inventory.model:
-     Asset            -> assetId, tag, name, status, locationId, custodianEmployeeId
-     InventoryItem    -> inventoryItemId, sku, description, quantityOnHand, locationId
-     AssetTransaction -> transactionId, assetId, type, employeeId, timestamp, notes
-     AssetStatus      -> AVAILABLE | CHECKED_OUT | MAINTENANCE | LOST | RETIRED
-     TransactionType  -> CHECKOUT | CHECKIN | MOVE | DISPOSE | RECOVER
-   ========================================================================== */
 
 (function (global) {
   'use strict';
-
-  /* ---------------------------------------------------------------- enums */
 
   var AssetStatus = {
     AVAILABLE: 'AVAILABLE',
@@ -34,10 +17,6 @@
     DISPOSE: 'DISPOSE',
     RECOVER: 'RECOVER'
   };
-
-  /* ---------------------------------------------------------------- roles */
-  /* Role keys match the planned Entra ID role claims (CSC-09 Identity &
-     Access). `can` lists the capability strings checked by Auth.can(). */
 
   var ROLES = {
     FIELD: {
@@ -95,10 +74,6 @@
     }
   };
 
-  /* ------------------------------------------------------------ demo users */
-  /* Prototype sign-in accounts. Production authentication is delegated to
-     Microsoft Entra ID (OIDC) - see SDD section 2.1.1, CSC-09. */
-
   var USERS = [
     { userId: 'usr-1001', name: 'Maria Alvarez',  email: 'malvarez@example-solar.com',  role: 'FIELD',   employeeId: 'emp-2001', site: 'San Diego Warehouse', status: 'ACTIVE',   lastSignIn: '2026-09-05T15:42:00' },
     { userId: 'usr-1002', name: 'Dana Nguyen',    email: 'dnguyen@example-solar.com',   role: 'MANAGER', employeeId: 'emp-2002', site: 'San Diego Warehouse', status: 'ACTIVE',   lastSignIn: '2026-09-06T07:10:00' },
@@ -109,10 +84,6 @@
     { userId: 'usr-1007', name: 'Jordan Wells',   email: 'jwells@example-solar.com',    role: 'MANAGER', employeeId: 'emp-2007', site: 'Otay Mesa Yard',      status: 'ACTIVE',   lastSignIn: '2026-09-03T09:48:00' },
     { userId: 'usr-1008', name: 'Alex Moreno',    email: 'amoreno@example-solar.com',   role: 'FIELD',   employeeId: 'emp-2008', site: 'San Diego Warehouse', status: 'DISABLED', lastSignIn: '2026-07-22T08:15:00' }
   ];
-
-  /* ------------------------------------------------------- employee lookup */
-  /* Synchronised inbound from the HR platform through CSC-13 (read-only
-     inside this application). */
 
   var EMPLOYEES = [
     { employeeId: 'emp-2001', externalHrId: 'HR-4471', name: 'Maria Alvarez', title: 'Lead Field Technician', site: 'San Diego Warehouse',  status: 'ACTIVE' },
@@ -125,8 +96,6 @@
     { employeeId: 'emp-2009', externalHrId: 'HR-4602', name: 'Rosa Delgado',  title: 'Installer I',           site: 'Riverside Solar Site', status: 'ACTIVE' },
     { employeeId: 'emp-2010', externalHrId: 'HR-4611', name: 'Ben Whitaker',  title: 'Service Technician',    site: 'San Diego Warehouse',  status: 'ACTIVE' }
   ];
-
-  /* ------------------------------------------------------------- locations */
 
   var LOCATIONS = [
     { locationId: 'loc-100', code: 'WH-SD',    name: 'San Diego Warehouse',  type: 'WAREHOUSE', address: '2210 Kettner Blvd, San Diego, CA' },
@@ -146,11 +115,6 @@
   ];
 
   var CONDITIONS = ['NEW', 'GOOD', 'FAIR', 'NEEDS_SERVICE', 'DAMAGED'];
-
-  /* ---------------------------------------------------------------- assets */
-  /* Uniquely tagged assets (Asset.java). Fields beyond the current Java model
-     - category, condition, serialNumber, purchase data - are part of the
-     target design in SDD section 2 and are flagged in the README. */
 
   var ASSETS = [
     { assetId: 'ast-0001', tag: 'IT-10042',  name: 'Panasonic Toughbook FZ-55',        category: 'IT',      serialNumber: 'FZ55-8842119',  status: AssetStatus.CHECKED_OUT, locationId: 'loc-300', custodianEmployeeId: 'emp-2001', condition: 'GOOD',          purchaseDate: '2024-03-18', purchaseCost: 3120.00, warrantyEnd: '2027-03-18', lastTransactionAt: '2026-09-05T07:12:00', notes: 'Primary field laptop for the PV commissioning crew.' },
@@ -177,10 +141,6 @@
     { assetId: 'ast-0018', tag: 'TEST-1195', name: 'Seaward PV210 Solar Tester',       category: 'TEST',    serialNumber: 'SW210-88410',   status: AssetStatus.CHECKED_OUT, locationId: 'loc-300', custodianEmployeeId: 'emp-2005', condition: 'GOOD',          purchaseDate: '2025-06-11', purchaseCost: 2340.00, warrantyEnd: '2028-06-11', lastTransactionAt: '2026-09-05T06:35:00', notes: '' }
   ];
 
-  /* ------------------------------------------------------- inventory items */
-  /* Quantity-managed stock (InventoryItem.java). reorderPoint supports
-     InventoryService.setThreshold() and the Low Stock report (CSC-06). */
-
   var INVENTORY = [
     { inventoryItemId: 'inv-0001', sku: 'SOL-MC4-100',  description: 'MC4 Connector Pair, 1000V',        category: 'Electrical',  uom: 'PR', quantityOnHand: 450,  reorderPoint: 200, unitCost: 1.85,  locationId: 'loc-100', lastCountedAt: '2026-08-31' },
     { inventoryItemId: 'inv-0002', sku: 'SOL-MC4-BRK',  description: 'MC4 Branch Connector Y, 2-to-1',   category: 'Electrical',  uom: 'EA', quantityOnHand: 96,   reorderPoint: 60,  unitCost: 6.40,  locationId: 'loc-100', lastCountedAt: '2026-08-31' },
@@ -196,10 +156,6 @@
     { inventoryItemId: 'inv-0012', sku: 'LBL-ASSET',    description: 'Asset Tag Labels, QR, roll of 100',category: 'Consumables', uom: 'EA', quantityOnHand: 900,  reorderPoint: 300, unitCost: 0.34,  locationId: 'loc-100', lastCountedAt: '2026-08-11' },
     { inventoryItemId: 'inv-0013', sku: 'CONS-SEAL',    description: 'Roof Sealant Tube, 10 oz',         category: 'Consumables', uom: 'EA', quantityOnHand: 0,    reorderPoint: 40,  unitCost: 8.75,  locationId: 'loc-200', lastCountedAt: '2026-09-04' }
   ];
-
-  /* ----------------------------------------------------- asset transactions */
-  /* AssetTransaction.java records. Preserved history - never overwritten
-     (SDD design constraint: Reliable transaction history). */
 
   var TRANSACTIONS = [
     { transactionId: 'txn-0001', assetId: 'ast-0001', type: TransactionType.CHECKOUT, employeeId: 'emp-2001', timestamp: '2026-09-05T07:12:00', notes: 'Checked out for Riverside commissioning week.',      locationId: 'loc-300', performedBy: 'usr-1002' },
@@ -224,11 +180,6 @@
     { transactionId: 'txn-0020', assetId: 'ast-0008', type: TransactionType.CHECKIN,  employeeId: 'emp-2007', timestamp: '2026-08-27T15:12:00', notes: 'Returned to yard. Fuel 3/4.',                        locationId: 'loc-200', performedBy: 'usr-1007' }
   ];
 
-  /* ------------------------------------------------ inventory adjustments */
-  /* Quantity movements for InventoryItem records. Kept separate from
-     AssetTransaction because TransactionType in the Java model applies to
-     tagged assets only - see README "Design notes for the team". */
-
   var ADJUSTMENTS = [
     { adjustmentId: 'adj-0001', inventoryItemId: 'inv-0001', delta: -50,  reason: 'ISSUE_TO_JOB',   reference: 'JOB-2291 Riverside', quantityAfter: 450,  timestamp: '2026-09-05T08:20:00', performedBy: 'usr-1001', notes: 'Issued to Riverside array string work.' },
     { adjustmentId: 'adj-0002', inventoryItemId: 'inv-0011', delta: -8,   reason: 'ISSUE_TO_JOB',   reference: 'JOB-2288 Vista MSP', quantityAfter: 12,   timestamp: '2026-09-03T09:05:00', performedBy: 'usr-1001', notes: '' },
@@ -249,10 +200,6 @@
     { code: 'TRANSFER',     label: 'Transfer between locations' }
   ];
 
-  /* ------------------------------------------------------------ work orders */
-  /* MaintenanceService (CSC-05): createWorkOrder, updateWorkOrder,
-     closeWorkOrder. */
-
   var WORK_ORDERS = [
     { workOrderId: 'wo-0001', number: 'WO-2026-0139', assetId: 'ast-0007', title: 'Front brake service and rotor replacement', type: 'CORRECTIVE', priority: 'HIGH',   status: 'IN_PROGRESS', assignedTo: 'emp-2010', vendor: 'Otay Fleet Services', openedAt: '2026-09-01T08:05:00', dueDate: '2026-09-09', closedAt: null, estimatedCost: 1450.00, notes: 'Vehicle out of service until complete.' },
     { workOrderId: 'wo-0002', number: 'WO-2026-0141', assetId: 'ast-0011', title: 'Hilti TE 60 chuck slipping - factory service', type: 'CORRECTIVE', priority: 'MEDIUM', status: 'OPEN',        assignedTo: 'emp-2002', vendor: 'Hilti Service Center', openedAt: '2026-08-31T14:20:00', dueDate: '2026-09-14', closedAt: null, estimatedCost: 380.00,  notes: 'RMA number pending.' },
@@ -262,20 +209,12 @@
     { workOrderId: 'wo-0006', number: 'WO-2026-0126', assetId: 'ast-0012', title: 'Chop saw blade replacement',                 type: 'CORRECTIVE', priority: 'LOW',    status: 'CLOSED',      assignedTo: 'emp-2005', vendor: 'In-house',            openedAt: '2026-08-20T11:20:00', dueDate: '2026-08-27', closedAt: '2026-08-24T09:10:00', estimatedCost: 68.00,  notes: 'Blade replaced from stock.' }
   ];
 
-  /* ----------------------------------------------------- purchase orders */
-  /* Synchronised inbound from the accounting/ERP platform through CSC-13.
-     Read-only in this prototype; receiving posts back a receipt status. */
-
   var PURCHASE_ORDERS = [
     { poId: 'po-0001', number: 'PO-8841', vendor: 'CED Greentech',   status: 'PARTIALLY_RECEIVED', orderedAt: '2026-08-24', expectedAt: '2026-09-08', total: 6840.00, lines: 3, receivedLines: 2, project: 'JOB-2291 Riverside' },
     { poId: 'po-0002', number: 'PO-8836', vendor: 'IronRidge',       status: 'RECEIVED',           orderedAt: '2026-08-14', expectedAt: '2026-08-28', total: 3120.00, lines: 2, receivedLines: 2, project: 'JOB-2288 Vista' },
     { poId: 'po-0003', number: 'PO-8850', vendor: 'Grainger',        status: 'OPEN',               orderedAt: '2026-09-02', expectedAt: '2026-09-12', total: 1490.00, lines: 4, receivedLines: 0, project: 'Stock replenishment' },
     { poId: 'po-0004', number: 'PO-8853', vendor: 'Fastenal',        status: 'OPEN',               orderedAt: '2026-09-04', expectedAt: '2026-09-15', total: 880.00,  lines: 2, receivedLines: 0, project: 'Stock replenishment' }
   ];
-
-  /* ------------------------------------------------------- audit events */
-  /* AuditService.recordEvent / searchEvents / exportAudit (CSC-12). Every
-     inventory-changing action and security event lands here. */
 
   var AUDIT = [
     { eventId: 'aud-0001', timestamp: '2026-09-06T07:10:22', actor: 'usr-1002', action: 'AUTH_SIGN_IN',       entityType: 'USER',      entityId: 'usr-1002', summary: 'Signed in through Microsoft Entra ID.',                    outcome: 'SUCCESS', ip: '10.20.4.18' },
@@ -300,17 +239,12 @@
     { eventId: 'aud-0020', timestamp: '2026-06-14T10:05:27', actor: 'usr-1004', action: 'ASSET_DISPOSE',      entityType: 'ASSET',     entityId: 'ast-0004', summary: 'IT-10011 disposed - e-waste certificate EW-88213.',        outcome: 'SUCCESS', ip: '10.20.1.7'  }
   ];
 
-  /* ------------------------------------------------------- integrations */
-  /* External Integration Gateway (CSC-13). Status is mocked. */
-
   var INTEGRATIONS = [
     { id: 'int-entra',   name: 'Microsoft Entra ID',      direction: 'Inbound', purpose: 'SSO, role claims (OIDC)',                        status: 'CONNECTED',  lastSync: '2026-09-06T07:00:00', owner: 'IT' },
     { id: 'int-hr',      name: 'HR Platform',             direction: 'Inbound / Outbound', purpose: 'Employee sync; assignment + return events', status: 'CONNECTED', lastSync: '2026-08-31T22:10:00', owner: 'HR' },
     { id: 'int-erp',     name: 'Accounting / ERP',        direction: 'Inbound / Outbound', purpose: 'Open POs in; receipt status out',           status: 'CONNECTED', lastSync: '2026-09-05T23:30:00', owner: 'Finance' },
     { id: 'int-billing', name: 'Project / Billing',       direction: 'Outbound', purpose: 'Allocation and shipment events',                 status: 'NOT_CONFIGURED', lastSync: null,               owner: 'Finance' }
   ];
-
-  /* ------------------------------------------------------------- exports */
 
   global.MockData = {
     AssetStatus: AssetStatus,

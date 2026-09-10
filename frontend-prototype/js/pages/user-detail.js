@@ -1,20 +1,3 @@
-/* ==========================================================================
-   pages/user-detail.js - Screen 12a: User profile
-   --------------------------------------------------------------------------
-   The profile behind a row in Administration > Users and roles. Maps to
-   UserController /api/users/{id} (CSC-09 Identity & Access).
-
-   Three things happen here that the list deliberately does not do: editing the
-   profile fields, changing the role, and setting a password. They are on their
-   own screen because each one changes what a person can do with the system,
-   and a row of buttons in a table invites doing that by accident.
-
-   Self-service guards. The server refuses to let an account demote, disable or
-   delete itself, and refuses to remove the last active administrator. This
-   screen disables those controls up front and says why, rather than letting
-   someone fill in a form and meet the refusal afterwards. The server check is
-   the real one; this is only courtesy.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -43,8 +26,6 @@
   }
 
   render();
-
-  /* --------------------------------------------------------------- render */
 
   function render() {
     page.innerHTML = UI.loading('Loading account…');
@@ -87,8 +68,6 @@
       + 'or deleting the account are blocked - ask another administrator to do those.</div></div>';
   }
 
-  /* ------------------------------------------------------------- profile */
-
   function profileCard(u, isSelf) {
     var lockRole = !canEdit || isSelf;
     var lockStatus = !canEdit || isSelf;
@@ -117,8 +96,6 @@
       + '</section>';
   }
 
-  /* ------------------------------------------------------------- account */
-
   function accountCard(u) {
     return '<section class="card"><div class="card__head"><h2>Account</h2></div>'
       + '<div class="card__body">'
@@ -140,8 +117,6 @@
       + '<div class="dl__val">' + html + '</div></div>';
   }
 
-  /* ------------------------------------------------------------ password */
-
   function passwordCard(u) {
     if (!canEdit) { return ''; }
 
@@ -161,9 +136,6 @@
       +   '<button class="btn btn--primary" type="button" id="sendLink">Email a password link</button>'
       + '</div>'
 
-      /* The direct route is kept, but folded away. It is the worse option
-         whenever a mailbox exists, and a screen that presents both equally
-         invites the habit of choosing it. */
       + '<div class="card__body" style="border-top:1px solid var(--c-border)">'
       +   '<details>'
       +     '<summary class="small">Set a password directly instead</summary>'
@@ -178,8 +150,6 @@
       + '</div>'
       + '</section>';
   }
-
-  /* -------------------------------------------------------------- delete */
 
   function dangerCard(u, isSelf) {
     if (!canEdit) { return ''; }
@@ -196,8 +166,6 @@
       +   (blocked ? ' disabled' : '') + '>Delete account</button></div>'
       + '</section>';
   }
-
-  /* --------------------------------------------------------------- wiring */
 
   function wire(u, isSelf) {
     var save = UI.qs('#saveProfile');
@@ -216,8 +184,6 @@
   function saveProfile(u, isSelf) {
     UI.clearErrors(page);
 
-    /* A disabled <select> is not read back - the locked value is carried over
-       from the loaded account so a save cannot silently reset it. */
     var lockRole = !canEdit || isSelf;
     var lockStatus = !canEdit || isSelf;
 
@@ -260,13 +226,6 @@
     }).catch(function (err) { UI.handleApiError(err, page); });
   }
 
-  /**
-   * Issues a fresh single-use link.
-   *
-   * <p>Always RESET rather than INVITE from this screen: the account already
-   * exists and may already be in use, so an hour is the right lifetime. A
-   * seven-day link to a live account is a spare key left under the mat.</p>
-   */
   function sendLink(u) {
     var button = UI.qs('#sendLink');
     var restore = function () {
@@ -345,8 +304,6 @@
       });
     }).catch(function (err) { UI.handleApiError(err, page); });
   }
-
-  /* -------------------------------------------------------------- helpers */
 
   function val(name) {
     var el = UI.qs('#f_' + name);

@@ -1,12 +1,3 @@
-/* ==========================================================================
-   pages/audit.js - Screen 13: Audit history
-   --------------------------------------------------------------------------
-   Maps to AuditService.searchEvents() and exportAudit() (CSC-12 Audit &
-   Monitoring). Every inventory-changing action, security event, and
-   integration job in this prototype writes a record that lands here,
-   including the actions that were REJECTED - which is what makes the
-   non-repudiation requirement in the STRIDE analysis testable.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -146,8 +137,6 @@
     }
     return '<span class="mono xsmall">' + UI.esc(e.entityType) + ' · ' + UI.esc(e.entityId) + '</span>';
   }
-
-  /* ------------------------------------------------------------- filters */
 
   function syncFromForm() {
     filters.query = UI.qs('#fQuery').value;

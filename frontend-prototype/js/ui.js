@@ -1,18 +1,8 @@
-/* ==========================================================================
-   ui.js - Shared shell, navigation, and UI utilities
-   --------------------------------------------------------------------------
-   Every screen calls UI.mountShell() once, then renders its own content into
-   #page. Keeping the sidebar, topbar, modal, and toast machinery in one file
-   means all 13 screens stay consistent, which is the UX requirement in SDD
-   section 2.1.2 (predictable layout and button placement).
-   ========================================================================== */
 
 (function (global) {
   'use strict';
 
   var doc = global.document;
-
-  /* ======================================================== AUTH / ROLES */
 
   var Auth = {
     user: function () { return global.Store.getSession(); },
@@ -22,14 +12,11 @@
       return u ? global.MockData.ROLES[u.role] : null;
     },
 
-    /** Mirrors AuthenticationService.requireRole() on the server. The server
-        must repeat every one of these checks - UI gating is convenience only. */
     can: function (capability) {
       var r = Auth.role();
       return !!(r && r.can.indexOf(capability) !== -1);
     },
 
-    /** Redirects to the login screen when there is no session. */
     require: function () {
       var u = Auth.user();
       if (!u) {
@@ -45,10 +32,6 @@
       });
     }
   };
-
-  /* ========================================================== NAVIGATION */
-  /* `cap` is the capability required to see the item. Items the current role
-     cannot use are not rendered at all (least privilege, SDD 2.1.2). */
 
   var NAV = [
     {
@@ -77,8 +60,6 @@
       ]
     }
   ];
-
-  /* ============================================================== HELPERS */
 
   function esc(value) {
     if (value === null || value === undefined) { return ''; }

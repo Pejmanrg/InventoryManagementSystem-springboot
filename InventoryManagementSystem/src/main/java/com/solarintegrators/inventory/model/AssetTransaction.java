@@ -14,19 +14,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * One event in the life of a tagged asset: checked out, returned, moved,
- * disposed of, or recovered.
- *
- * <p>Transaction history is evidence, so this entity is append-only: it exposes
- * no setters and the table carries no update path. Current values on
- * {@code Asset} may change; the record of how they got that way may not. This is
- * the "reliable transaction history" design constraint from the SDD.</p>
- */
 @Entity
 @Table(name = "asset_transactions")
 public class AssetTransaction {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "transaction_id", nullable = false, updatable = false)
@@ -40,7 +30,6 @@ public class AssetTransaction {
     @Column(name = "type", nullable = false, length = 24, updatable = false)
     private TransactionType type;
 
-    /** The employee the asset went to or came back from. Null for MOVE or DISPOSE. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", updatable = false)
     private Employee employee;
@@ -49,11 +38,6 @@ public class AssetTransaction {
     @JoinColumn(name = "location_id", updatable = false)
     private Location location;
 
-    /**
-     * Status before and after the event. Storing both makes a history row
-     * self-describing: reading "AVAILABLE to CHECKED_OUT" needs no replay of
-     * every earlier row to work out what the transition actually was.
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "status_from", length = 24, updatable = false)
     private AssetStatus statusFrom;
@@ -68,7 +52,6 @@ public class AssetTransaction {
     @Column(name = "notes", length = 2000, updatable = false)
     private String notes;
 
-    /** Username of the signed-in user who performed the action. */
     @Column(name = "performed_by", length = 120, updatable = false)
     private String performedBy;
 

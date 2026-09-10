@@ -7,9 +7,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import org.springframework.data.jpa.domain.Specification;
 
-/** Filter predicates for the inventory list endpoint. */
 public final class InventorySpecifications {
-
     private InventorySpecifications() {
     }
 
@@ -37,13 +35,6 @@ public final class InventorySpecifications {
                 : (root, query, cb) -> cb.equal(root.get("category"), category);
     }
 
-    /**
-     * Quantity on hand is at or below the reorder point.
-     *
-     * <p>A column-to-column comparison, which is why the two operands are typed
-     * explicitly: {@code Root.get(String)} returns an untyped path, and
-     * {@code lessThanOrEqualTo} needs a comparable type to bind to.</p>
-     */
     public static Specification<InventoryItem> belowReorderPoint(Boolean lowStockOnly) {
         if (!Boolean.TRUE.equals(lowStockOnly)) {
             return null;

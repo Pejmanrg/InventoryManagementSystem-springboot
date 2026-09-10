@@ -6,20 +6,10 @@ import jakarta.persistence.criteria.Predicate;
 import java.util.UUID;
 import org.springframework.data.jpa.domain.Specification;
 
-/**
- * Filter predicates for the asset search endpoint.
- *
- * <p>Written with the Criteria API rather than a JPQL query with nullable
- * parameters, because every filter here is optional and a single query with
- * five {@code (:param is null or ...)} clauses is both harder to read and
- * harder for the optimiser to plan.</p>
- */
 public final class AssetSpecifications {
-
     private AssetSpecifications() {
     }
 
-    /** Matches the prototype's AssetRepository.search(): tag, name, or serial contains the text. */
     public static Specification<Asset> textMatches(String query) {
         if (query == null || query.isBlank()) {
             return null;

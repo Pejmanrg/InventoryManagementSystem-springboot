@@ -5,15 +5,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/**
- * Edits an existing account's profile.
- *
- * <p>Deliberately cannot change the username or the password. The username is
- * what the audit trail records as the actor, so letting it change would make
- * historical entries ambiguous; the password has its own endpoint so that a
- * reset is a distinct, separately auditable action rather than a side effect
- * of editing a job title.</p>
- */
 public record UpdateUserRequest(
 
         @Size(max = 80, message = "A first name may be at most 80 characters.")

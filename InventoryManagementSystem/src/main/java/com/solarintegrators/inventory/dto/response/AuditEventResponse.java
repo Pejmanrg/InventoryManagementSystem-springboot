@@ -5,7 +5,6 @@ import com.solarintegrators.inventory.model.AuditOutcome;
 import java.time.Instant;
 import java.util.UUID;
 
-/** API view of an {@link AuditEvent}. */
 public record AuditEventResponse(
         UUID eventId,
         Instant occurredAt,
@@ -15,7 +14,6 @@ public record AuditEventResponse(
         String entityId,
         String summary,
         AuditOutcome outcome) {
-
     public static AuditEventResponse from(AuditEvent event) {
         return new AuditEventResponse(
                 event.getEventId(),

@@ -1,11 +1,3 @@
-/* ==========================================================================
-   pages/reports.js - Screen 11: Reports
-   --------------------------------------------------------------------------
-   One tab per ReportService method in the SDD cross-reference (CSC-06):
-     assetsBySite()  assetsByEmployee()  lowStock()  maintenanceDue()
-   Export is gated on the report.export capability and is recorded in the
-   audit history, matching ExportService.exportAuthorizedDataset() (CSC-08).
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -84,8 +76,6 @@
         + '<div class="alert__body">' + UI.esc(err.message) + '</div></div></div>';
     });
   }
-
-  /* ------------------------------------------------------------ renderers */
 
   function renderSite(rows) {
     var max = Math.max.apply(null, rows.map(function (r) { return r.total; }).concat([1]));
@@ -183,8 +173,6 @@
         }).join('')
       + '</tbody></table></div>';
   }
-
-  /* --------------------------------------------------------------- export */
 
   var exportBtn = UI.qs('#exportBtn');
   if (exportBtn) {

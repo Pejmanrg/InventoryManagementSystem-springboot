@@ -1,60 +1,13 @@
-/* ==========================================================================
-   api.js - Live API layer (Phase 1)
-   --------------------------------------------------------------------------
-   This is the ONLY file that screens talk to for data. Every function is
-   asynchronous and returns a Promise. No screen code changed when this file
-   was switched from mock data to the deployed Spring Boot service.
-
-   WHAT IS LIVE  - calls https://inventory-api-...run.app over HTTP Basic:
-     auth          sign-in validated against the real API
-     assets        AssetController        /api/assets
-     transactions  AssetLifecycleController + TransactionController
-     inventory     InventoryController    /api/inventory
-     audit         AuditController        /api/audit
-     reports       computed client-side from live assets / inventory / locations
-     admin.lookups locations come from /api/locations
-     admin.users   UserController         /api/users (ADMIN only)
-     invitations   InvitationController   /api/invitations, /api/password-reset
-                                          - the only unauthenticated calls
-
-   WHAT IS STILL MOCKED - no backend exists for these yet (Phase 2):
-     maintenance   work orders   - no MaintenanceController / WorkOrder entity
-     reports.maintenanceDue      - depends on work orders
-     admin.integrations / purchaseOrders
-
-   Mocked functions still read and write the in-browser Store, so those screens
-   behave exactly as they did in the prototype. They are marked MOCK below.
-
-   Business rules are now enforced by the Java service layer, not here. This
-   file no longer duplicates them - it surfaces the server's error responses as
-   ApiError so the screens' existing error handling keeps working.
-   ========================================================================== */
 
 (function (global) {
   'use strict';
 
-  /* ============================================================== CONFIG */
-
-  /** Deployed Cloud Run service. Change this one line to point elsewhere. */
   var API_BASE = 'https://inventory-api-173479193959.us-west2.run.app';
 
-  /**
-   * Marks a call that must carry no Authorization header at all.
-   *
-   * Not the same as simply having no session. Spring's Basic authentication
-   * filter runs before the authorization rules, so a stale or wrong credential
-   * left in sessionStorage is rejected with 401 even on a path the server
-   * permits anonymously - which would break the password-reset page for exactly
-   * the person most likely to have a wrong credential saved.
-   */
   var ANONYMOUS = { anonymous: true };
 
-  /** Page size used for screens that render a full list rather than paging. */
   var PAGE_SIZE = 500;
 
-  /* ============================================================== HELPERS */
-
-  /** Mirrors a Spring `ProblemDetail` / ApiErrorResponse. Unchanged contract. */
   function ApiError(status, message, field) {
     this.name = 'ApiError';
     this.status = status;     // 400 | 401 | 403 | 404 | 409
@@ -84,7 +37,6 @@
     return s ? s.userId : 'system';
   }
 
-  /** The Basic credential is kept on the session object Store already persists. */
   function authHeader() {
     var s = global.Store.getSession();
     return s && s.basic ? ('Basic ' + s.basic) : null;
@@ -101,13 +53,6 @@
     return parts.length ? ('?' + parts.join('&')) : '';
   }
 
-  /**
-   * Single point of contact with the API.
-   *
-   * Translates a non-2xx response into ApiError using the server's
-   * ApiErrorResponse body (status, message, fieldErrors[0].field) so screens
-   * keep showing field-level validation exactly as they did against the mock.
-   */
   function http(method, path, body, params, credentialOverride) {
     var headers = { 'Accept': 'application/json' };
     var cred = credentialOverride === ANONYMOUS ? null : (credentialOverride || authHeader());
@@ -149,13 +94,11 @@
           throw new ApiError(res.status, message, field);
         });
       }, function (networkError) {
-        /* fetch() rejects only on network / CORS failure, never on HTTP status. */
         throw new ApiError(0,
           'Cannot reach the inventory service. Check your connection and that the API is running.');
       });
   }
 
-  /** PageResponse<T> -> plain array; bare List<T> passes through untouched. */
   function unwrap(payload) {
     if (payload && Object.prototype.hasOwnProperty.call(payload, 'content')
         && Array.isArray(payload.content)) {
@@ -163,10 +106,6 @@
     }
     return Array.isArray(payload) ? payload : [];
   }
-
-  /* ------------------------------------------------- reference data cache */
-  /* Locations and employees are small, change rarely, and are needed to
-     decorate rows the API returns by id only. Fetched once per page load. */
 
   var cache = { locations: null, employees: null };
 
@@ -188,11 +127,6 @@
 
   function invalidateCache() { cache.locations = null; cache.employees = null; }
 
-  /**
-   * The API supplies locationName and custodianName already. It does not supply
-   * locationCode or categoryName, which some screens render, so those are
-   * derived here - falling back to the raw code rather than showing blanks.
-   */
   function decorateAsset(a, locs) {
     if (!a) { return a; }
     var loc = locs ? byId(locs, 'locationId', a.locationId) : null;
@@ -204,25 +138,7 @@
     return a;
   }
 
-  /* ================================================================= AUTH */
-  /* LIVE. The backend uses HTTP Basic, so "signing in" means proving the
-     credential works and then keeping it for subsequent requests. There is no
-     session endpoint and no token to obtain - GET /api/users/me is called as a
-     cheap probe that every authenticated role may make, and it answers the one
-     question the UI cannot answer for itself: which role am I? Before this
-     endpoint existed the role was guessed from the username, which was only
-     ever correct for the four accounts in application.yml. */
-
   var auth = {
-    /**
-     * Validates username + password against the API, then stores the
-     * credential on the session so every later request can send it.
-     *
-     * The credential is held in sessionStorage via Store, which means it is
-     * gone when the tab closes and never written to localStorage. It is still
-     * readable by any script on this origin - acceptable for Basic auth in
-     * Phase 1, and the reason Phase 3 moves to a short-lived OIDC token.
-     */
     signIn: function (username, password) {
       username = String(username || '').trim();
       password = String(password == null ? '' : password);
@@ -236,8 +152,6 @@
 
       var basic;
       try {
-        /* btoa handles Latin-1 only; encodeURIComponent/unescape widens it so a
-           non-ASCII password does not throw before it reaches the server. */
         basic = global.btoa(unescape(encodeURIComponent(username + ':' + password)));
       } catch (e) {
         return Promise.reject(new ApiError(400, 'That username or password contains characters the browser cannot encode.'));
@@ -246,10 +160,6 @@
       return http('GET', '/api/users/me', null, null, 'Basic ' + basic)
         .then(function (me) {
           me = me || {};
-          /* The server is the only authority on role. An unrecognised value
-             falls back to the least-privileged role rather than an empty menu;
-             the server re-checks every action either way, so a wrong guess here
-             can only ever hide something, never permit it. */
           var role = global.MockData.ROLES[me.role] ? me.role : 'FIELD';
           var session = {
             userId: me.userId || username,
@@ -258,8 +168,6 @@
             email: me.email || '',
             jobTitle: me.jobTitle || '',
             role: role,
-            /* Null for a configured break-glass account: it has no row in
-               app_users, so there is no /api/users/{id} profile to open. */
             accountId: me.userId || null,
             employeeId: null,
             site: '',
@@ -290,11 +198,7 @@
     session: function () { return global.Store.getSession(); }
   };
 
-  /* =============================================================== ASSETS */
-  /* LIVE - AssetController /api/assets */
-
   var assets = {
-    /** GET /api/assets */
     list: function (params) {
       params = params || {};
       var query = { page: 0, size: PAGE_SIZE };
@@ -305,31 +209,23 @@
 
       return Promise.all([http('GET', '/api/assets', null, query), locations()])
         .then(function (results) {
-          var rows = unwrap(results[0]);
           var locs = results[1];
-          var q = String(params.query || '').trim().toLowerCase();
-
-          /* Filtered again client-side: the server's parameter names are not
-             guaranteed to match every filter the screens send, and an ignored
-             query parameter would silently return unfiltered rows. */
-          return rows.filter(function (a) {
-            if (params.status && a.status !== params.status) { return false; }
-            if (params.locationId && a.locationId !== params.locationId) { return false; }
-            if (params.category && a.category !== params.category) { return false; }
-            if (params.custodianEmployeeId && a.custodianEmployeeId !== params.custodianEmployeeId) { return false; }
-            if (!q) { return true; }
-            return contains(a.name, q) || contains(a.tag, q) || contains(a.serialNumber, q);
-          }).map(function (a) { return decorateAsset(a, locs); });
+          // Query, status, location and category are filtered by the API.
+          // Custodian is not a parameter it accepts, so that one is applied here.
+          return unwrap(results[0])
+            .filter(function (a) {
+              return !params.custodianEmployeeId
+                  || a.custodianEmployeeId === params.custodianEmployeeId;
+            })
+            .map(function (a) { return decorateAsset(a, locs); });
         });
     },
 
-    /** GET /api/assets/{assetId} */
     get: function (assetId) {
       return Promise.all([http('GET', '/api/assets/' + encodeURIComponent(assetId)), locations()])
         .then(function (r) { return decorateAsset(r[0], r[1]); });
     },
 
-    /** GET /api/assets/by-tag/{tag} - barcode / QR lookup */
     getByTag: function (tag) {
       return Promise.all([
         http('GET', '/api/assets/by-tag/' + encodeURIComponent(String(tag || '').trim())),
@@ -337,7 +233,6 @@
       ]).then(function (r) { return decorateAsset(r[0], r[1]); });
     },
 
-    /** POST /api/assets - validation is now enforced by the Java service. */
     create: function (dto) {
       var body = {
         tag: dto.tag,
@@ -355,7 +250,6 @@
         .then(function (r) { return decorateAsset(r[0], r[1]); });
     },
 
-    /** PUT /api/assets/{assetId} - MANAGER or ADMIN only. */
     update: function (assetId, dto) {
       var body = {};
       ['name', 'category', 'serialNumber', 'condition', 'notes', 'locationId'].forEach(function (k) {
@@ -367,19 +261,11 @@
       ]).then(function (r) { return decorateAsset(r[0], r[1]); });
     },
 
-    /** GET /api/assets/{assetId}/history - returns a bare List. */
     history: function (assetId) {
       return http('GET', '/api/assets/' + encodeURIComponent(assetId) + '/history')
         .then(unwrap);
     }
   };
-
-  /* ========================================================= TRANSACTIONS */
-  /* LIVE - AssetLifecycleController. Note the lifecycle endpoints return the
-     updated AssetResponse only, not the transaction that caused it. The mock
-     returned { asset, transaction }; that shape is preserved with a null
-     transaction so calling screens do not break. Screens that displayed the
-     returned transaction should read the asset's history instead. */
 
   function lifecycle(assetId, action, body) {
     return Promise.all([
@@ -391,7 +277,6 @@
   }
 
   var transactions = {
-    /** POST /api/assets/{assetId}/checkout */
     checkOut: function (assetId, employeeId, options) {
       options = options || {};
       if (!employeeId) {
@@ -404,7 +289,6 @@
       });
     },
 
-    /** POST /api/assets/{assetId}/checkin, then /maintenance if requested. */
     checkIn: function (assetId, options) {
       options = options || {};
       return lifecycle(assetId, 'checkin', {
@@ -416,7 +300,6 @@
           result.workOrder = null;
           return result;
         }
-        /* Two calls because the backend models these as separate transitions. */
         return lifecycle(assetId, 'maintenance', {
           notes: options.maintenanceTitle || 'Service required after check-in'
         }).then(function (afterMaintenance) {
@@ -426,7 +309,6 @@
       });
     },
 
-    /** POST /api/assets/{assetId}/move */
     move: function (assetId, locationId, notes) {
       if (!locationId) {
         return Promise.reject(new ApiError(400, 'A destination location is required.', 'locationId'));
@@ -434,27 +316,22 @@
       return lifecycle(assetId, 'move', { locationId: locationId, notes: notes || 'Location transfer' });
     },
 
-    /** POST /api/assets/{assetId}/retire  (the mock called this dispose) */
     dispose: function (assetId, notes) {
       return lifecycle(assetId, 'retire', { notes: notes || 'Disposed' });
     },
 
-    /** POST /api/assets/{assetId}/recover */
     recover: function (assetId, notes) {
       return lifecycle(assetId, 'recover', { notes: notes || 'Recovered' });
     },
 
-    /** POST /api/assets/{assetId}/lost  (the mock called this markLost) */
     markLost: function (assetId, notes) {
       return lifecycle(assetId, 'lost', { notes: notes || 'Reported lost' });
     },
 
-    /** GET /api/transactions - recent activity feed, PageResponse. */
     recent: function (limit) {
       return http('GET', '/api/transactions', null, { page: 0, size: limit || 10 })
         .then(function (payload) {
           return unwrap(payload).map(function (t) {
-            /* TransactionResponse carries assetTag but not assetName. */
             t.assetName = t.assetName || t.assetTag || '-';
             t.employeeName = t.employeeName || '-';
             return t;
@@ -463,19 +340,13 @@
     }
   };
 
-  /* ============================================================ INVENTORY */
-  /* LIVE - InventoryController. stockState and extendedValue are computed
-     server-side in InventoryItemResponse, so nothing is recomputed here. */
-
   function normaliseItem(i) {
     if (!i) { return i; }
-    /* The prototype screens read `uom`; the DTO field is unitOfMeasure. */
     i.uom = i.uom || i.unitOfMeasure || '';
     return i;
   }
 
   var inventory = {
-    /** GET /api/inventory */
     list: function (params) {
       params = params || {};
       var query = { page: 0, size: PAGE_SIZE };
@@ -484,38 +355,23 @@
       if (params.category) { query.category = params.category; }
 
       return http('GET', '/api/inventory', null, query).then(function (payload) {
-        var q = String(params.query || '').trim().toLowerCase();
+        // stockState is derived from the quantity, so the API cannot filter on it.
         return unwrap(payload).map(normaliseItem).filter(function (i) {
-          if (params.locationId && i.locationId !== params.locationId) { return false; }
-          if (params.category && i.category !== params.category) { return false; }
-          if (params.stockState && i.stockState !== params.stockState) { return false; }
-          if (!q) { return true; }
-          return contains(i.sku, q) || contains(i.description, q);
+          return !params.stockState || i.stockState === params.stockState;
         });
       });
     },
 
-    /** GET /api/inventory/{itemId} */
     get: function (itemId) {
       return http('GET', '/api/inventory/' + encodeURIComponent(itemId)).then(normaliseItem);
     },
 
-    /**
-     * POST /api/inventory/{itemId}/adjust
-     *
-     * Returns AdjustmentResponse { item, previousQuantity, delta, newQuantity,
-     * reason, reference }. Reshaped to the mock's { item, adjustment,
-     * previousQuantity } so screens keep working.
-     */
     adjust: function (itemId, delta, meta) {
       meta = meta || {};
       var d = Number(delta);
       if (!isFinite(d) || d === 0) {
         return Promise.reject(new ApiError(400, 'Enter an adjustment quantity other than zero.', 'delta'));
       }
-      /* Stock is counted in whole units. The server refuses this as well and
-         the database constraint refuses it after that; checking here saves a
-         round trip and keeps any future caller of this layer honest. */
       if (Math.floor(d) !== d) {
         return Promise.reject(new ApiError(400,
           'Stock is counted in whole units - an adjustment cannot be a fraction.', 'delta'));
@@ -548,11 +404,6 @@
       });
     },
 
-    /**
-     * MOCK. There is no GET /api/inventory/{id}/adjustments endpoint; the
-     * adjustment ledger is only visible through the audit trail in Phase 1.
-     * Falls back to filtering audit events for this item.
-     */
     adjustments: function (itemId, limit) {
       return auditApi.search({ entityType: 'INVENTORY', action: 'INVENTORY_ADJUST' })
         .then(function (events) {
@@ -579,12 +430,7 @@
     }
   };
 
-  /* ================================================================ AUDIT */
-  /* LIVE - AuditController. AuditEventResponse uses occurredAt, not timestamp,
-     and carries no actor display name or IP; those are filled in here. */
-
   var auditApi = {
-    /** GET /api/audit */
     search: function (params) {
       params = params || {};
       var query = { page: 0, size: PAGE_SIZE };
@@ -613,7 +459,6 @@
       });
     },
 
-    /** Client-side CSV build - there is no export endpoint. */
     exportCsv: function (rows) {
       return Promise.resolve((function () {
         var header = 'timestamp,actor,action,entityType,entityId,outcome,summary';

@@ -1,18 +1,3 @@
-/* ==========================================================================
-   store.js - Client-side state container for the prototype
-   --------------------------------------------------------------------------
-   Holds the working copy of the mock dataset so that actions performed on one
-   screen (check out an asset, adjust stock, open a work order) are visible on
-   the other screens during a demonstration.
-
-   Persistence strategy:
-     1st choice  sessionStorage - survives page-to-page navigation in one tab
-     fallback    in-memory object - used when storage is unavailable or blocked
-   Nothing is written to localStorage, and nothing leaves the browser.
-
-   When the Spring Boot API is introduced this whole file disappears: the
-   server becomes the state container and api.js calls it directly.
-   ========================================================================== */
 
 (function (global) {
   'use strict';
@@ -20,7 +5,6 @@
   var STATE_KEY   = 'cims.state.v1';
   var SESSION_KEY = 'cims.session.v1';
 
-  /* In-memory fallback used when sessionStorage throws or is unavailable. */
   var memory = {};
   var storageOk = (function () {
     try {
@@ -35,7 +19,7 @@
 
   function readRaw(key) {
     if (storageOk) {
-      try { return global.sessionStorage.getItem(key); } catch (e) { /* fall through */ }
+      try { return global.sessionStorage.getItem(key); } catch (e) {  }
     }
     return Object.prototype.hasOwnProperty.call(memory, key) ? memory[key] : null;
   }
@@ -43,22 +27,20 @@
   function writeRaw(key, value) {
     memory[key] = value;
     if (storageOk) {
-      try { global.sessionStorage.setItem(key, value); } catch (e) { /* keep memory copy */ }
+      try { global.sessionStorage.setItem(key, value); } catch (e) {  }
     }
   }
 
   function removeRaw(key) {
     delete memory[key];
     if (storageOk) {
-      try { global.sessionStorage.removeItem(key); } catch (e) { /* ignore */ }
+      try { global.sessionStorage.removeItem(key); } catch (e) {  }
     }
   }
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
   }
-
-  /* ------------------------------------------------------- dataset state */
 
   function seed() {
     var d = global.MockData;
@@ -85,7 +67,7 @@
       try {
         state = JSON.parse(raw);
         if (state && state.assets && state.assets.length) { return state; }
-      } catch (e) { /* corrupt - reseed below */ }
+      } catch (e) {  }
     }
     state = seed();
     persist();
@@ -94,7 +76,7 @@
 
   function persist() {
     if (!state) { return; }
-    try { writeRaw(STATE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+    try { writeRaw(STATE_KEY, JSON.stringify(state)); } catch (e) {  }
   }
 
   function reset() {
@@ -109,8 +91,6 @@
     persist();
     return prefix + '-' + String(s.seq).padStart(4, '0');
   }
-
-  /* ------------------------------------------------------- session state */
 
   function getSession() {
     var raw = readRaw(SESSION_KEY);

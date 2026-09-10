@@ -1,11 +1,3 @@
-/* ==========================================================================
-   pages/asset-detail.js - Screen 4: Asset detail
-   --------------------------------------------------------------------------
-   Maps to AssetService.getAsset() plus TransactionService.getHistory()
-   (CSC-03 and CSC-04). Lifecycle actions follow the asset state machine in
-   the SDD (Figure 6): only transitions valid for the current status are
-   offered, and each one asks for confirmation before it is committed.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -64,8 +56,6 @@
         '<a class="btn btn--primary" href="assets.html">Back to assets</a>');
     });
   }
-
-  /* -------------------------------------------------------------- panels */
 
   function detailsCard(a) {
     return '<section class="card"><div class="card__head"><h2>Asset details</h2>'
@@ -140,8 +130,6 @@
         : UI.emptyState('No work orders', 'This asset has no maintenance history recorded.'))
       + '</div></section>';
   }
-
-  /* ------------------------------------------------------------ actions */
 
   function renderActions(a) {
     var buttons = [];

@@ -1,11 +1,3 @@
-/* ==========================================================================
-   pages/asset-new.js - Screen 5: Create asset
-   --------------------------------------------------------------------------
-   Maps to AssetService.createAsset() (CSC-03). Reproduces the same three
-   server-side rules in the browser so the user sees them immediately:
-     tag is required, name is required, tag must be unique.
-   The server check still runs - the client copy is convenience, not security.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -81,8 +73,6 @@
     +   '</div>'
     + '</form>';
 
-  /* ------------------------------------------------------ field builders */
-
   function wrap(name, label, required, control, hint) {
     return '<div class="field">'
       + '<label class="field__label" for="' + name + '">' + UI.esc(label)
@@ -113,8 +103,6 @@
     return wrap(name, label, false, '<select id="' + name + '" name="' + name + '">' + options + '</select>');
   }
 
-  /* ---------------------------------------------------------- validation */
-
   function setError(name, message) {
     var input = UI.qs('[name="' + name + '"]');
     var field = input.closest('.field');
@@ -135,7 +123,6 @@
     input.closest('.field').classList.add('is-valid');
   }
 
-  /* Live duplicate-tag feedback, matching AssetService.createAsset(). */
   UI.qs('#tag').addEventListener('blur', function (e) {
     var value = e.target.value.trim();
     if (!value) { return; }
@@ -149,8 +136,6 @@
   ['tag', 'name'].forEach(function (n) {
     UI.qs('#' + n).addEventListener('input', function () { clearError(n); });
   });
-
-  /* -------------------------------------------------------------- submit */
 
   UI.qs('#assetForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -169,7 +154,6 @@
       notes: UI.qs('#notes').value.trim()
     };
 
-    /* Client-side mirror of the service rules */
     if (!dto.tag)  { setError('tag', 'Asset tag is required.').focus(); return; }
     if (!dto.name) { setError('name', 'Asset name is required.').focus(); return; }
     if (dto.warrantyEnd && dto.purchaseDate && dto.warrantyEnd < dto.purchaseDate) {

@@ -26,22 +26,10 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * Web-layer tests: the HTTP status codes and the JSON error contract.
- *
- * <p>The service tests prove the rules hold. These prove that a client sees the
- * right thing when a rule fires - a 409 rather than a 500, and a body with a
- * machine-readable code rather than a stack trace. Those two failures are what
- * make an API painful to integrate against, and neither is visible from a
- * service test.</p>
- */
 @AutoConfigureMockMvc
 class AssetApiIntegrationTest extends AbstractIntegrationTest {
-
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
-
-    /* -------------------------------------------------------- happy path -- */
 
     @Test
     @DisplayName("POST /api/assets returns 201 with a Location header")
@@ -107,8 +95,6 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("AVAILABLE"));
     }
-
-    /* ------------------------------------------------------ error shapes -- */
 
     @Test
     @DisplayName("400: a missing required field returns the field-level error list")
@@ -204,8 +190,6 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(inventoryService.getStock(item.inventoryItemId())).isEqualByComparingTo("500");
     }
-
-    /* --------------------------------------------------------- security -- */
 
     @Test
     @DisplayName("401: an unauthenticated request is refused")

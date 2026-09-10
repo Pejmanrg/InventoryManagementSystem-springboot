@@ -1,16 +1,3 @@
-/* ==========================================================================
-   pages/checkout.js - Screen 6: Check-out asset workflow
-   --------------------------------------------------------------------------
-   Implements the SDD "Check Out Asset" use case (section 2.1.2) and the
-   process view in Figure 3 / Figure 5:
-
-     select asset -> validate status -> record receiving employee
-       -> change status -> write transaction history -> audit -> confirm
-
-   Only AVAILABLE assets can be selected. If an unavailable asset arrives via
-   a link or a scan, the workflow refuses it and explains why, and no
-   inventory change is committed (SDD alternate flow).
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -42,7 +29,6 @@
     +   '<div id="stepBody">' + UI.loading('Loading available assets…') + '</div>'
     + '</section>';
 
-  /* Preselected asset from the assets list, a dashboard link, or a scan. */
   var preselect = UI.param('assetId');
 
   API.assets.list({ status: D.AssetStatus.AVAILABLE }).then(function (rows) {
@@ -56,14 +42,12 @@
           state.locationId = a.locationId;
           state.step = 2;
         }
-      }).catch(function () { /* fall through to picker */ });
+      }).catch(function () {  });
     }
   }).then(render).catch(function (err) {
     UI.qs('#stepBody').innerHTML = '<div class="card__body"><div class="alert alert--danger">'
       + '<div class="alert__body">' + UI.esc(err.message) + '</div></div></div>';
   });
-
-  /* --------------------------------------------------------------- steps */
 
   var STEPS = ['Select asset', 'Assign employee', 'Review & confirm'];
 
@@ -84,8 +68,6 @@
     if (state.step === 3) { return renderReview(); }
     return renderDone();
   }
-
-  /* -------- step 1: pick an available asset ------------------------------ */
 
   function renderPick() {
     UI.qs('#stepBody').innerHTML = ''
@@ -128,8 +110,6 @@
       }));
     });
   }
-
-  /* -------- step 2: receiving employee and details ----------------------- */
 
   function renderAssign() {
     var a = state.asset;
@@ -200,8 +180,6 @@
       e.target.closest('.field').classList.remove('has-error');
     });
   }
-
-  /* -------- step 3: review and commit ------------------------------------ */
 
   function renderReview() {
     var a = state.asset;
@@ -274,8 +252,6 @@
       });
     });
   }
-
-  /* -------- step 4: confirmation ----------------------------------------- */
 
   function renderDone() {
     UI.qs('#stepper').innerHTML = STEPS.map(function (label, i) {

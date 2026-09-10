@@ -18,32 +18,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * A uniquely tagged company asset: laptop, vehicle, power tool, safety kit, or
- * test instrument.
- *
- * <p>Converted from the Module 2 console prototype. The fields and behaviour of
- * the original class are preserved; the changes are that the object is now a JPA
- * entity, that {@code locationId} and {@code custodianEmployeeId} are modelled as
- * associations so the database can enforce referential integrity, and that the
- * descriptive attributes from section 2 of the SDD (category, condition, serial
- * number, purchase and warranty data) now exist as columns.</p>
- *
- * <p>{@code assetId} is a UUID assigned by Hibernate on persist. Status changes
- * are made through {@code TransactionService} so that a transaction record and an
- * audit event are always written with them - never by setting the status
- * directly from a controller.</p>
- */
 @Entity
 @Table(name = "assets")
 public class Asset {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "asset_id", nullable = false, updatable = false)
     private UUID assetId;
 
-    /** Human-readable identifier printed on the barcode or QR label. Unique. */
     @Column(name = "tag", nullable = false, length = 64, unique = true)
     private String tag;
 
@@ -92,7 +74,6 @@ public class Asset {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    /** Optimistic lock. Two concurrent check-outs of the same asset cannot both win. */
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -101,10 +82,6 @@ public class Asset {
         // required by JPA
     }
 
-    /**
-     * Creates an asset in the AVAILABLE state with no custodian, which is the
-     * only state a new asset may start in.
-     */
     public Asset(String tag, String name, Location location) {
         this.tag = tag;
         this.name = name;
@@ -161,9 +138,6 @@ public class Asset {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public long getVersion() { return version; }
-
-    /* Convenience accessors that keep the identifier-based reads used by the
-       original console prototype working unchanged. */
 
     public UUID getLocationId() {
         return location == null ? null : location.getLocationId();

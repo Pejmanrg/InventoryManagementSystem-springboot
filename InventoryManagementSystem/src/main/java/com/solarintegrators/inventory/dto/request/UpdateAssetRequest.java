@@ -6,11 +6,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * Payload for PUT /api/assets/{id}. Every field is optional; null means "leave
- * unchanged". The asset tag is deliberately absent - transaction history refers
- * to it, so it is set once at creation.
- */
 public record UpdateAssetRequest(
         @Size(max = 160) String name,
         @Size(max = 32) String category,

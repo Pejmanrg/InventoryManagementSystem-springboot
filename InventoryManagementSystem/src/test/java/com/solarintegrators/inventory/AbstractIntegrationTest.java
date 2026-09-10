@@ -25,24 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-/**
- * Shared setup for the service-level integration tests.
- *
- * <p>These tests run against the real Spring context and a real database - an
- * in-memory H2 in PostgreSQL mode - rather than against mocks. A mocked
- * repository would happily accept a duplicate tag and a negative quantity,
- * which are exactly the behaviours under test; only a database can prove the
- * rules hold end to end.</p>
- *
- * <p>The tests are deliberately not wrapped in a rolled-back transaction.
- * {@code AuditService.recordDenied()} commits in {@code REQUIRES_NEW} so that
- * rejected attempts survive the rollback of the business transaction, and a
- * test-managed rollback cannot undo that. Each test therefore starts by
- * truncating the tables in foreign-key order instead.</p>
- */
 @SpringBootTest
 public abstract class AbstractIntegrationTest {
-
     @Autowired protected AssetService assetService;
     @Autowired protected TransactionService transactionService;
     @Autowired protected InventoryService inventoryService;
@@ -69,8 +53,6 @@ public abstract class AbstractIntegrationTest {
         auditEventRepository.deleteAll();
     }
 
-    /* ------------------------------------------------------- fixtures --- */
-
     protected LocationResponse givenWarehouse() {
         return locationService.createLocation(new CreateLocationRequest(
                 "WH-SD", "San Diego Warehouse", "WAREHOUSE", "2210 Kettner Blvd, San Diego, CA"));
@@ -86,7 +68,6 @@ public abstract class AbstractIntegrationTest {
                 "Maria Alvarez", "malvarez@example-solar.com", "Lead Field Technician", null, "HR-4471"));
     }
 
-    /** The Module 2 demonstration asset: IT-10042, a Toughbook, AVAILABLE. */
     protected AssetResponse givenAvailableAsset(LocationResponse location) {
         return assetService.createAsset(new CreateAssetRequest(
                 "IT-10042", "Field Laptop Toughbook FZ-55", "IT", "FZ55-8842119",
@@ -101,7 +82,6 @@ public abstract class AbstractIntegrationTest {
                 "GOOD", null, null, null, null));
     }
 
-    /** The Module 2 demonstration stock item: 500 MC4 connectors. */
     protected InventoryItemResponse givenStockedItem(BigDecimal quantity) {
         return inventoryService.createItem(new CreateInventoryItemRequest(
                 "SOL-MC4-100", "MC4 Solar Cable Connectors", "Electrical", "PR",

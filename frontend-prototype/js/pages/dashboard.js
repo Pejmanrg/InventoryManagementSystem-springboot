@@ -1,10 +1,3 @@
-/* ==========================================================================
-   pages/dashboard.js - Screen 2: Dashboard
-   --------------------------------------------------------------------------
-   Maps to ReportService.summary() (CSC-06 Reporting & Administration).
-   Tiles, quick actions, and panels are filtered by role so each user sees the
-   operational picture that belongs to their job (SDD 2.1.2 user view).
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -29,8 +22,6 @@
     +   '<div class="stack" id="colSide"></div>'
     + '</div>';
 
-  /* ------------------------------------------------------- quick actions */
-
   var actions = [];
   if (Auth.can('asset.checkout')) { actions.push('<a class="btn btn--primary" href="checkout.html">Check out asset</a>'); }
   if (Auth.can('asset.checkin'))  { actions.push('<a class="btn" href="checkin.html">Check in asset</a>'); }
@@ -38,8 +29,6 @@
   if (Auth.can('asset.create'))   { actions.push('<a class="btn" href="asset-new.html">New asset</a>'); }
   if (!actions.length && Auth.can('report.view.all')) { actions.push('<a class="btn btn--primary" href="reports.html">Open reports</a>'); }
   UI.qs('#quickActions').innerHTML = actions.join('');
-
-  /* ------------------------------------------------------------- render */
 
   Promise.all([
     API.reports.summary(),
@@ -50,7 +39,6 @@
   ]).then(function (results) {
     var s = results[0], recent = results[1], low = results[2], due = results[3], mine = results[4];
 
-    /* ---- KPI tiles (role-weighted) ---- */
     var tiles = [
       tile('Total assets', UI.fmtNumber(s.assetTotal), s.available + ' available · ' + s.checkedOut + ' checked out', 'accent'),
       tile('Checked out', UI.fmtNumber(s.checkedOut), 'Currently assigned to employees', ''),
@@ -69,7 +57,6 @@
     }
     UI.qs('#kpis').innerHTML = tiles.join('');
 
-    /* ---- Main column ---- */
     var main = [];
 
     main.push(card('Asset status distribution', ''
@@ -99,7 +86,6 @@
 
     UI.qs('#colMain').innerHTML = main.join('');
 
-    /* ---- Side column ---- */
     var side = [];
 
     if (mine.length) {
@@ -145,8 +131,6 @@
     page.innerHTML = '<div class="alert alert--danger"><div class="alert__body">'
       + UI.esc(err.message) + '</div></div>';
   });
-
-  /* ------------------------------------------------------------ helpers */
 
   function tile(label, value, meta, variant) {
     return '<div class="card kpi' + (variant ? ' kpi--' + variant : '') + '">'

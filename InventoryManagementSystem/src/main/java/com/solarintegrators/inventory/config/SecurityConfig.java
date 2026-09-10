@@ -15,37 +15,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * Phase 1 security.
- *
- * <p>HTTP Basic, stateless sessions, and method-level authorization with
- * {@code @PreAuthorize} on the controllers. The roles are the four from the SDD
- * user view: FIELD, MANAGER, FINANCE, ADMIN.</p>
- *
- * <p><strong>Where accounts come from.</strong> Accounts live in the
- * {@code app_users} table and are administered through {@code /api/users}.
- * {@link DatabaseUserDetailsService} is the primary {@code UserDetailsService}
- * and resolves them; the configured accounts below remain only as the
- * break-glass path it falls back to when the database does not know a username.
- * See that class for why the fallback exists and how precedence works.</p>
- *
- * <p><strong>What this is not.</strong> It is not the production identity
- * design. Microsoft Entra ID with OpenID Connect is Phase 3 (CSC-09). When that
- * arrives, the change is contained: replace {@code httpBasic} with
- * {@code oauth2ResourceServer(jwt)}, delete both this configured store and
- * {@link DatabaseUserDetailsService}, and map role claims to authorities. The
- * {@code @PreAuthorize} rules on the controllers are written against role
- * names, so they do not change at all.</p>
- *
- * <p>CSRF is disabled because this is a token-style stateless API with no
- * cookie-based session for a browser to replay - not because CSRF does not
- * matter. If a session cookie is ever introduced, this decision must be
- * revisited.</p>
- */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-
     @Bean
     public SecurityFilterChain apiFilterChain(HttpSecurity http, SecurityProperties properties) throws Exception {
         http
@@ -56,14 +28,6 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                    /*
-                     * The only unauthenticated API paths, and they must be:
-                     * everyone they serve is a person who cannot sign in. A
-                     * single-use token delivered to an address already on file
-                     * stands in for the credential. Listed before /api/** -
-                     * these rules are evaluated in order, and the first match
-                     * wins, so putting them after would make them unreachable.
-                     */
                     .requestMatchers("/api/invitations/**", "/api/password-reset").permitAll()
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().denyAll())
@@ -75,19 +39,6 @@ public class SecurityConfig {
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
-
-    /*
-     * There is deliberately no UserDetailsService bean here.
-     *
-     * Spring Security auto-configures its authentication provider only when
-     * exactly one UserDetailsService bean exists. Publishing the configured
-     * break-glass accounts as a second bean alongside DatabaseUserDetailsService
-     * makes that count two, Spring wires no provider at all, and every request
-     * returns 401 - including the break-glass account meant to rescue you.
-     *
-     * The configured accounts are therefore built inside
-     * DatabaseUserDetailsService, which is the single UserDetailsService bean.
-     */
 
     private CorsConfigurationSource corsConfigurationSource(SecurityProperties properties) {
         CorsConfiguration configuration = new CorsConfiguration();

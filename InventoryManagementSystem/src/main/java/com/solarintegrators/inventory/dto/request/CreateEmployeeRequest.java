@@ -5,13 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
-/**
- * Payload for POST /api/employees.
- *
- * <p>{@code externalHrId} is accepted now so that records created by hand today
- * can be matched to the HR platform when that integration is built, without a
- * data migration.</p>
- */
 public record CreateEmployeeRequest(
         @NotBlank(message = "Employee name is required.")
         @Size(max = 160) String name,

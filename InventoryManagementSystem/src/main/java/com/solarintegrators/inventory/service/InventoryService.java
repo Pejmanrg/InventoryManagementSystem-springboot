@@ -6,7 +6,6 @@ import com.solarintegrators.inventory.dto.response.AdjustmentResponse;
 import com.solarintegrators.inventory.dto.response.InventoryItemResponse;
 import com.solarintegrators.inventory.dto.response.PageResponse;
 import com.solarintegrators.inventory.exception.DuplicateResourceException;
-import com.solarintegrators.inventory.exception.InsufficientStockException;
 import com.solarintegrators.inventory.exception.InvalidRequestException;
 import com.solarintegrators.inventory.exception.ResourceNotFoundException;
 import com.solarintegrators.inventory.model.InventoryItem;
@@ -22,20 +21,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Quantity-managed stock (CSC-03).
- *
- * <p>Ported from the console prototype with its central rule unchanged: an
- * adjustment that would leave quantity on hand below zero is refused and nothing
- * is written. The prototype guarded that with a {@code synchronized} method,
- * which only serialises threads inside one JVM. Here the row is locked in the
- * database and a check constraint on the table backs the rule up, so it holds
- * across application instances and against any writer.</p>
- */
 @Service
 @Transactional
 public class InventoryService {
-
     private final InventoryRepository inventoryRepository;
     private final LocationRepository locationRepository;
     private final AuditService auditService;
@@ -48,11 +36,6 @@ public class InventoryService {
         this.auditService = auditService;
     }
 
-    /**
-     * Creates a stocked item.
-     *
-     * @throws DuplicateResourceException the SKU is already in use (409)
-     */
     public InventoryItemResponse createItem(CreateInventoryItemRequest request) {
         String sku = trimToNull(request.sku());
         if (sku == null) {
@@ -67,7 +50,7 @@ public class InventoryService {
         BigDecimal initial = request.initialQuantity() == null ? BigDecimal.ZERO : request.initialQuantity();
         requireWholeUnits(initial, "initialQuantity", "Initial quantity");
         if (initial.compareTo(BigDecimal.ZERO) < 0) {
-            throw new InvalidRequestException("INVENTORY_NEGATIVE_INITIAL", "initialQuantity",
+            throw new InvalidRequestException("initialQuantity",
                     "Initial quantity cannot be negative.");
         }
 
@@ -83,7 +66,7 @@ public class InventoryService {
         item.setLastCountedAt(Instant.now());
 
         InventoryItem saved = inventoryRepository.save(item);
-        auditService.record("INVENTORY_CREATE", "INVENTORY", saved.getInventoryItemId(),
+        auditService.recordEvent("INVENTORY_CREATE", "INVENTORY", saved.getInventoryItemId(),
                 saved.getSku() + " created with quantity " + saved.getQuantityOnHand() + ".");
         return InventoryItemResponse.from(saved);
     }
@@ -93,7 +76,6 @@ public class InventoryService {
         return InventoryItemResponse.from(requireItem(itemId));
     }
 
-    /** Current quantity on hand - the prototype's {@code getStock()}. */
     @Transactional(readOnly = true)
     public BigDecimal getStock(UUID itemId) {
         return requireItem(itemId).getQuantityOnHand();
@@ -118,18 +100,6 @@ public class InventoryService {
         return PageResponse.of(page, InventoryItemResponse::from);
     }
 
-    /**
-     * Applies a signed quantity change.
-     *
-     * <p>Negative issues stock, positive receives it. The resulting quantity is
-     * computed and checked before anything is written; if it would be negative
-     * the whole transaction is refused, the attempt is recorded as a denied
-     * audit event, and quantity on hand is left exactly as it was.</p>
-     *
-     * @throws InvalidRequestException     delta is zero or the reason is missing (400)
-     * @throws ResourceNotFoundException   the item does not exist (404)
-     * @throws InsufficientStockException  the result would be negative (409)
-     */
     public AdjustmentResponse adjustQuantity(UUID itemId, AdjustQuantityRequest request) {
         if (request == null || request.delta() == null) {
             throw InvalidRequestException.required("delta", "An adjustment quantity is required.");
@@ -137,7 +107,7 @@ public class InventoryService {
         BigDecimal delta = request.delta();
         requireWholeUnits(delta, "delta", "Adjustment quantity");
         if (delta.compareTo(BigDecimal.ZERO) == 0) {
-            throw new InvalidRequestException("INVENTORY_ZERO_DELTA", "delta",
+            throw new InvalidRequestException("delta",
                     "Enter an adjustment quantity other than zero.");
         }
         String reason = trimToNull(request.reason());
@@ -155,14 +125,15 @@ public class InventoryService {
             auditService.recordDenied("INVENTORY_ADJUST", "INVENTORY", itemId,
                     "Adjustment rejected - " + item.getSku() + " would fall below zero ("
                             + previous + " " + signed(delta) + ").");
-            throw new InsufficientStockException(item.getSku(), previous, delta);
+            throw new IllegalStateException("Insufficient stock for " + item.getSku()
+                    + ": on hand " + previous + ", requested " + delta + ".");
         }
 
         item.setQuantityOnHand(updated);
         item.setLastCountedAt(Instant.now());
         InventoryItem saved = inventoryRepository.save(item);
 
-        auditService.record("INVENTORY_ADJUST", "INVENTORY", itemId,
+        auditService.recordEvent("INVENTORY_ADJUST", "INVENTORY", itemId,
                 saved.getSku() + " adjusted by " + signed(delta) + " (" + previous + " to " + updated + ")"
                         + ", reason " + reason
                         + (request.reference() != null && !request.reference().isBlank()
@@ -172,28 +143,24 @@ public class InventoryService {
                 reason, request.reference());
     }
 
-    /* ------------------------------------------------------------------ */
+    public InventoryItemResponse setThreshold(UUID itemId, BigDecimal reorderPoint) {
+        if (reorderPoint == null || reorderPoint.compareTo(BigDecimal.ZERO) < 0) {
+            throw InvalidRequestException.required("reorderPoint", "A reorder point of zero or more is required.");
+        }
+        requireWholeUnits(reorderPoint, "reorderPoint", "Reorder point");
 
-    /**
-     * Refuses a fractional quantity.
-     *
-     * <p>Stock is counted, not measured. Half a connector cannot be issued to a
-     * job, and a fractional balance never reconciles against a physical count,
-     * so a fraction arriving here is an entry error every time.</p>
-     *
-     * <p>Enforced in the service rather than as {@code @Digits} on the request,
-     * because {@code @Digits(fraction = 0)} rejects {@code 10.0} - a caller
-     * whose JSON serialiser writes a trailing zero would be refused over
-     * formatting rather than over the rule. {@code stripTrailingZeros} first
-     * makes {@code 10.0} and {@code 10} the same number, which they are.</p>
-     *
-     * <p>The database repeats this check. Validation here produces the readable
-     * message; the constraint is what holds when a row is written by some route
-     * that never passes through this method.</p>
-     */
+        InventoryItem item = requireItem(itemId);
+        item.setReorderPoint(reorderPoint);
+        InventoryItem saved = inventoryRepository.save(item);
+
+        auditService.recordEvent("INVENTORY_THRESHOLD", "INVENTORY_ITEM", saved.getInventoryItemId(),
+                "Reorder point for " + saved.getSku() + " set to " + reorderPoint + ".");
+        return InventoryItemResponse.from(saved);
+    }
+
     private static void requireWholeUnits(BigDecimal value, String field, String label) {
         if (value != null && value.stripTrailingZeros().scale() > 0) {
-            throw new InvalidRequestException("QUANTITY_NOT_WHOLE", field,
+            throw new InvalidRequestException(field,
                     label + " must be a whole number - stock is counted in whole units.");
         }
     }

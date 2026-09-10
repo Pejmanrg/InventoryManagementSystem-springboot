@@ -12,16 +12,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Locations: warehouses, yards, vehicles, job sites, offices.
- *
- * <p>Reference data rather than transactional data, so the list endpoint returns
- * a plain array - these are counted in dozens, not thousands.</p>
- */
 @Service
 @Transactional
 public class LocationService {
-
     private final LocationRepository locationRepository;
     private final AuditService auditService;
 
@@ -48,7 +41,7 @@ public class LocationService {
 
         Location saved = locationRepository.save(
                 new Location(code, name, request.type(), request.address()));
-        auditService.record("LOCATION_CREATE", "LOCATION", saved.getLocationId(),
+        auditService.recordEvent("LOCATION_CREATE", "LOCATION", saved.getLocationId(),
                 "Location " + saved.getCode() + " (" + saved.getName() + ") created.");
         return LocationResponse.from(saved);
     }

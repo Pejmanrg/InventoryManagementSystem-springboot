@@ -2,39 +2,25 @@ package com.solarintegrators.inventory.exception;
 
 import java.util.NoSuchElementException;
 
-/**
- * A requested record does not exist. Maps to HTTP 404.
- *
- * <p>Extends {@link NoSuchElementException} so the services keep throwing what
- * the console prototype threw; the subclass only adds an error code.</p>
- */
-public class ResourceNotFoundException extends NoSuchElementException implements HasErrorCode {
+public class ResourceNotFoundException extends NoSuchElementException {
 
-    private final String code;
-
-    public ResourceNotFoundException(String code, String message) {
+    public ResourceNotFoundException(String message) {
         super(message);
-        this.code = code;
     }
 
     public static ResourceNotFoundException asset(Object id) {
-        return new ResourceNotFoundException("ASSET_NOT_FOUND", "Asset not found: " + id);
+        return new ResourceNotFoundException("Asset not found: " + id);
     }
 
     public static ResourceNotFoundException inventoryItem(Object id) {
-        return new ResourceNotFoundException("INVENTORY_ITEM_NOT_FOUND", "Inventory item not found: " + id);
+        return new ResourceNotFoundException("Inventory item not found: " + id);
     }
 
     public static ResourceNotFoundException location(Object id) {
-        return new ResourceNotFoundException("LOCATION_NOT_FOUND", "Location not found: " + id);
+        return new ResourceNotFoundException("Location not found: " + id);
     }
 
     public static ResourceNotFoundException employee(Object id) {
-        return new ResourceNotFoundException("EMPLOYEE_NOT_FOUND", "Employee not found: " + id);
-    }
-
-    @Override
-    public String getCode() {
-        return code;
+        return new ResourceNotFoundException("Employee not found: " + id);
     }
 }

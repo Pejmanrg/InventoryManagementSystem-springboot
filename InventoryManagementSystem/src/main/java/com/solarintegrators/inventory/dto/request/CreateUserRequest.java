@@ -7,21 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/**
- * Creates a sign-in account.
- *
- * <p>The password arrives in plaintext over HTTPS and is hashed before it
- * reaches the database; it is never stored, logged, or returned. The minimum
- * length is enforced here rather than only in the browser, because the API is
- * reachable directly and a client-side rule is a convenience, not a control.</p>
- */
 public record CreateUserRequest(
 
-        /*
-         * Restricted to characters that survive a URL path segment and an HTTP
-         * Basic credential without escaping. A colon in particular would break
-         * Basic auth, which joins username and password with one.
-         */
         @NotBlank(message = "A username is required.")
         @Size(max = 64, message = "A username may be at most 64 characters.")
         @Pattern(regexp = "^[A-Za-z0-9._@-]+$",
@@ -44,19 +31,8 @@ public record CreateUserRequest(
         @NotNull(message = "A role is required.")
         UserRole role,
 
-        /*
-         * Optional. Omit it and the account is created with a hash nothing can
-         * match, to be replaced by the holder through an invitation link - the
-         * preferred route, because it is the only one where no administrator
-         * ever knows the password. Supplying one directly is still allowed for
-         * an account whose owner has no mailbox to receive a link at.
-         *
-         * @Size ignores null, so the minimum still applies whenever a value is
-         * actually given.
-         */
         @Size(min = 10, max = 100, message = "A password must be at least 10 characters.")
         String password,
 
-        /** Null is treated as active; an account is usually wanted immediately. */
         Boolean active) {
 }

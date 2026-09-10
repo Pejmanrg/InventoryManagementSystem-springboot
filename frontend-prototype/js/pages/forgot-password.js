@@ -1,14 +1,3 @@
-/* ==========================================================================
-   pages/forgot-password.js - Requesting a password reset link
-   --------------------------------------------------------------------------
-   Runs without a session, like set-password.js, and for the same reason.
-
-   The confirmation this page shows is identical whether or not the account
-   exists. That is not vagueness for its own sake: a page that says "no such
-   account" is a way for anyone to test whether a given person works here, one
-   address at a time. The server answers 202 to everything for the same reason,
-   so the two cannot disagree.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -63,10 +52,6 @@
     button.disabled = true;
     button.textContent = 'Sending…';
 
-    /* Both branches show the same thing. A network failure is worth reporting -
-       that is about this browser, not about who has an account - but any answer
-       from the server means the request was taken, and nothing more is
-       disclosed. */
     API.invitations.requestReset(value).then(sent).catch(function (err) {
       if (err && err.status === 0) {
         button.disabled = false;

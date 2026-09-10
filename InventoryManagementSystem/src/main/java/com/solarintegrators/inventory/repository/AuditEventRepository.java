@@ -8,11 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
-/** Persistence for audit records. Append-only: nothing here updates or deletes. */
 @Repository
 public interface AuditEventRepository
         extends JpaRepository<AuditEvent, UUID>, JpaSpecificationExecutor<AuditEvent> {
-
     Page<AuditEvent> findAllByOrderByOccurredAtDesc(Pageable pageable);
 
     Page<AuditEvent> findByEntityIdOrderByOccurredAtDesc(String entityId, Pageable pageable);

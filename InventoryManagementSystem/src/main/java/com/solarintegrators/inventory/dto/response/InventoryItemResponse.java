@@ -5,12 +5,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * API view of an {@link InventoryItem}.
- *
- * <p>{@code stockState} is derived here rather than stored, so it can never
- * disagree with the quantity it describes.</p>
- */
 public record InventoryItemResponse(
         UUID inventoryItemId,
         String sku,
@@ -25,8 +19,6 @@ public record InventoryItemResponse(
         UUID locationId,
         String locationName,
         Instant lastCountedAt) {
-
-    /** Must be called inside the transaction: it reads the lazy association. */
     public static InventoryItemResponse from(InventoryItem item) {
         BigDecimal quantity = item.getQuantityOnHand() == null ? BigDecimal.ZERO : item.getQuantityOnHand();
         BigDecimal reorder = item.getReorderPoint() == null ? BigDecimal.ZERO : item.getReorderPoint();

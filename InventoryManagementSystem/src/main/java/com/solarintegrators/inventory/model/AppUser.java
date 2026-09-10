@@ -11,29 +11,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * An account that can sign in to the application.
- *
- * <p>Distinct from {@link Employee} on purpose. An employee is someone who can
- * hold custody of an asset; a user is someone who can operate the system. Most
- * employees never sign in, and some users - an auditor, a systems
- * administrator - never hold equipment. Conflating them would force a fake
- * employee record for every administrator and a fake login for every field
- * worker.</p>
- *
- * <p>The password is stored only as a BCrypt hash, is never returned by the
- * API, and has no getter that exposes it for serialisation - it is read solely
- * by the authentication path.</p>
- *
- * <p>Phase 3 note: when Microsoft Entra ID (CSC-09) becomes the identity
- * provider, {@code passwordHash} disappears and this table keeps only the
- * application-side profile - role, job title, active flag - keyed by the
- * external subject claim.</p>
- */
 @Entity
 @Table(name = "app_users")
 public class AppUser {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "user_id", nullable = false, updatable = false)
@@ -54,10 +34,6 @@ public class AppUser {
     @Column(name = "job_title", length = 120)
     private String jobTitle;
 
-    /**
-     * Stored as the enum name rather than its ordinal: an ordinal would silently
-     * remap every existing row if the enum's declaration order ever changed.
-     */
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 16)
     private UserRole role;
@@ -87,7 +63,6 @@ public class AppUser {
         this.passwordHash = passwordHash;
     }
 
-    /** Display name for the interface; falls back to the username. */
     public String getDisplayName() {
         String first = firstName == null ? "" : firstName.trim();
         String last = lastName == null ? "" : lastName.trim();
@@ -129,7 +104,6 @@ public class AppUser {
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 
-    /** Deliberately omits the hash so it cannot reach a log line. */
     @Override
     public String toString() {
         return String.format("AppUser[ID=%s, Username='%s', Role=%s]", userId, username, role);

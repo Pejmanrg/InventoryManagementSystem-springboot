@@ -19,23 +19,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Creation, retrieval, search, and editing of tagged assets (CSC-03).
- *
- * <p>Ported from the console prototype with its rules intact: an asset needs a
- * tag and a name, the tag must be unique, and a new asset starts AVAILABLE with
- * no custodian. What changed is where the data lives and that the checks now run
- * inside a transaction.</p>
- *
- * <p>Status is deliberately not editable here. Every status change goes through
- * {@link TransactionService} so a transaction record and an audit event are
- * always written with it - a status field that anything can set is a status
- * field with no history behind it.</p>
- */
 @Service
 @Transactional
 public class AssetService {
-
     private final AssetRepository assetRepository;
     private final LocationRepository locationRepository;
     private final AuditService auditService;
@@ -48,13 +34,6 @@ public class AssetService {
         this.auditService = auditService;
     }
 
-    /**
-     * Registers a new asset.
-     *
-     * @throws InvalidRequestException     tag or name missing (400)
-     * @throws DuplicateResourceException  the tag is already in use (409)
-     * @throws ResourceNotFoundException   the location does not exist (404)
-     */
     public AssetResponse createAsset(CreateAssetRequest request) {
         String tag = trimToNull(request.tag());
         String name = trimToNull(request.name());
@@ -83,7 +62,7 @@ public class AssetService {
         asset.setNotes(request.notes());
 
         Asset saved = assetRepository.save(asset);
-        auditService.record("ASSET_CREATE", "ASSET", saved.getAssetId(),
+        auditService.recordEvent("ASSET_CREATE", "ASSET", saved.getAssetId(),
                 saved.getTag() + " created with status " + AssetStatus.AVAILABLE + ".");
         return AssetResponse.from(saved);
     }
@@ -93,7 +72,6 @@ public class AssetService {
         return AssetResponse.from(requireAsset(assetId));
     }
 
-    /** Tag lookup - the path a barcode or QR scan takes. */
     @Transactional(readOnly = true)
     public AssetResponse getAssetByTag(String tag) {
         return assetRepository.findByTagIgnoreCase(tag)
@@ -101,10 +79,6 @@ public class AssetService {
                 .orElseThrow(() -> ResourceNotFoundException.asset(tag));
     }
 
-    /**
-     * Filtered search. Every parameter is optional; passing none returns every
-     * asset, one page at a time.
-     */
     @Transactional(readOnly = true)
     public PageResponse<AssetResponse> searchAssets(String query,
                                                     AssetStatus status,
@@ -126,7 +100,6 @@ public class AssetService {
         return PageResponse.of(page, AssetResponse::from);
     }
 
-    /** Combines two optional specifications, either of which may be null. */
     private static <T> Specification<T> and(Specification<T> base, Specification<T> next) {
         if (next == null) {
             return base;
@@ -134,10 +107,6 @@ public class AssetService {
         return base == null ? next : base.and(next);
     }
 
-    /**
-     * Updates descriptive fields. Null fields are left unchanged, and neither
-     * the tag nor the status can be changed here.
-     */
     public AssetResponse updateAsset(UUID assetId, UpdateAssetRequest request) {
         Asset asset = requireAsset(assetId);
 
@@ -170,16 +139,11 @@ public class AssetService {
         }
 
         Asset saved = assetRepository.save(asset);
-        auditService.record("ASSET_UPDATE", "ASSET", saved.getAssetId(),
+        auditService.recordEvent("ASSET_UPDATE", "ASSET", saved.getAssetId(),
                 saved.getTag() + " details updated.");
         return AssetResponse.from(saved);
     }
 
-    /* ------------------------------------------------------------------ *
-     * Shared with TransactionService                                      *
-     * ------------------------------------------------------------------ */
-
-    /** Loads an asset or throws 404. Package-visible for the lifecycle service. */
     @Transactional(readOnly = true)
     public Asset requireAsset(UUID assetId) {
         return assetRepository.findById(assetId)

@@ -1,5 +1,6 @@
-package com.solarintegrators.inventory.config;
+package com.solarintegrators.inventory.service;
 
+import com.solarintegrators.inventory.config.SecurityProperties;
 import com.solarintegrators.inventory.model.AppUser;
 import com.solarintegrators.inventory.repository.AppUserRepository;
 import java.time.Duration;
@@ -19,74 +20,27 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import com.solarintegrators.inventory.model.UserRole;
+import java.util.List;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
-/**
- * Authenticates against the {@code app_users} table, falling back to the
- * accounts in application.yml.
- *
- * <p><strong>Why this is the only UserDetailsService bean.</strong> Spring
- * Security auto-configures its authentication provider only when exactly one
- * {@code UserDetailsService} bean exists; with two it wires none at all and
- * every credential is rejected. The configured accounts are therefore built
- * here as a private map rather than published as a second bean. Marking one
- * {@code @Primary} does not help - the check counts beans, not precedence.</p>
- *
- * <p><strong>Why a fallback exists.</strong> Moving accounts into the database
- * makes the database a single point of failure for getting in at all. An empty
- * table after a fresh migration, a bad hash written by hand, or a deleted last
- * administrator would otherwise lock everyone out, with a redeploy as the only
- * repair. The configuration accounts remain as a break-glass path for exactly
- * those cases.</p>
- *
- * <p><strong>Precedence.</strong> The database wins whenever the username exists
- * there. Configuration is consulted only for usernames the database does not
- * know, so creating a database account named {@code admin} takes over that name
- * rather than being shadowed - otherwise changing a password in the interface
- * would appear to work while the old configured credential still authenticated.
- * A disabled database account is rejected outright rather than falling through,
- * so deactivating a user cannot silently re-enable them under their configured
- * password.</p>
- *
- * <p>Phase 3 removes this class entirely: Entra ID issues a token and no
- * password is verified by this application at all.</p>
- */
 @Service
-public class DatabaseUserDetailsService implements UserDetailsService {
+public class AuthenticationService implements UserDetailsService {
+    private static final Logger log = LoggerFactory.getLogger(AuthenticationService.class);
 
-    private static final Logger log = LoggerFactory.getLogger(DatabaseUserDetailsService.class);
-
-    /**
-     * Sign-in is stateless HTTP Basic, so every request re-authenticates.
-     * Writing last_login_at on each one would add a database write to every API
-     * call for a column that only needs to be roughly right, so it is refreshed
-     * at most once per interval per account.
-     */
     private static final Duration LAST_LOGIN_REFRESH_INTERVAL = Duration.ofMinutes(15);
 
     private final AppUserRepository appUserRepository;
 
-    /**
-     * Break-glass accounts, hashed once at startup. Keyed by lower-cased username.
-     *
-     * <p>This holds credential data, not built {@link UserDetails} objects, and
-     * {@link #loadUserByUsername} constructs a fresh instance on every call. That is
-     * not defensive style, it is required. Spring Security's {@code ProviderManager}
-     * enables {@code eraseCredentialsAfterAuthentication} by default: after a
-     * successful sign-in it calls {@code eraseCredentials()} on the returned token,
-     * which walks into the principal and sets {@code User.password} to null. Handing
-     * out a cached instance therefore means the first successful login on a container
-     * instance destroys the stored hash, and every later request on that instance
-     * fails with "Empty encoded password" and a 401 - intermittently, because a fresh
-     * instance starts out working again. Spring's own
-     * {@code InMemoryUserDetailsManager} returns a copy for exactly this reason.</p>
-     */
     private final Map<String, ConfiguredAccount> configuredUsers = new LinkedHashMap<>();
 
-    /** An immutable break-glass credential. Never handed to Spring Security directly. */
     private record ConfiguredAccount(String username, String encodedPassword, String role) {
     }
 
-    public DatabaseUserDetailsService(AppUserRepository appUserRepository,
+    public AuthenticationService(AppUserRepository appUserRepository,
                                       SecurityProperties properties,
                                       PasswordEncoder passwordEncoder) {
         this.appUserRepository = appUserRepository;
@@ -103,6 +57,33 @@ public class DatabaseUserDetailsService implements UserDetailsService {
 
         log.info("Authentication ready: database accounts first, {} configured break-glass account(s).",
                 configuredUsers.size());
+    }
+
+    // CSC-09. The controllers express this as @PreAuthorize; these two make the
+    // same check available to code that is not an annotated controller method.
+    public void requireRole(UserRole role) {
+        if (!hasRole(role)) {
+            throw new AccessDeniedException("This action requires the " + role + " role.");
+        }
+    }
+
+    public boolean hasRole(UserRole role) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) return false;
+        String wanted = "ROLE_" + role.name();
+        return authentication.getAuthorities().stream()
+                .anyMatch(granted -> wanted.equals(granted.getAuthority()));
+    }
+
+    public Map<String, Object> getClaims() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) return Map.of();
+        List<String> roles = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(authority -> authority.startsWith("ROLE_"))
+                .map(authority -> authority.substring("ROLE_".length()))
+                .toList();
+        return Map.of("username", authentication.getName(), "roles", roles);
     }
 
     @Override
@@ -131,18 +112,9 @@ public class DatabaseUserDetailsService implements UserDetailsService {
                     .build();
         }
 
-        /* Neutral message: whether a username exists is not something an
-           unauthenticated caller should be able to probe. */
         throw new UsernameNotFoundException("Bad credentials");
     }
 
-    /**
-     * Records when an account was last used.
-     *
-     * <p>Runs in its own transaction so a failure here can never fail the
-     * request that just authenticated successfully - a bookkeeping column is not
-     * worth rejecting a valid sign-in over.</p>
-     */
     @EventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAuthenticationSuccess(AuthenticationSuccessEvent event) {

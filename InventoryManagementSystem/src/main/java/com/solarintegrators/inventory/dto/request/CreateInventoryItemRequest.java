@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-/** Payload for POST /api/inventory. */
 public record CreateInventoryItemRequest(
         @NotBlank(message = "SKU is required.")
         @Size(max = 64) String sku,

@@ -29,26 +29,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-/**
- * Reproduces the Module 2 console demonstration against the real database.
- *
- * <p>{@code Main.java} used to wire the repositories and services by hand and
- * run this scenario on startup: create asset IT-10042, find it by searching for
- * "Toughbook", check it out, check it back in, print the history, create 500 MC4
- * connectors, and reduce them to 450. That scenario is preserved here so the
- * same demonstration can still be given - through the same services, now with
- * persistence, validation, and an audit trail behind them.</p>
- *
- * <p>Only active under the {@code demo} profile:</p>
- * <pre>mvn spring-boot:run -Dspring-boot.run.profiles=demo</pre>
- *
- * <p>It does nothing if the database already contains assets, so restarting a
- * demo environment does not accumulate duplicates.</p>
- */
 @Configuration
 @Profile("demo")
 public class DemoDataRunner {
-
     private static final Logger log = LoggerFactory.getLogger(DemoDataRunner.class);
 
     @Bean

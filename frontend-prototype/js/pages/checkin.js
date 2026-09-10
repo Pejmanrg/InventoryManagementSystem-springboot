@@ -1,12 +1,3 @@
-/* ==========================================================================
-   pages/checkin.js - Screen 7: Check-in asset workflow
-   --------------------------------------------------------------------------
-   Mirror of the check-out workflow for TransactionService.checkIn() (CSC-04).
-   Only assets currently CHECKED_OUT can be returned. A return flagged as
-   needing service moves the asset to MAINTENANCE and opens a work order,
-   which is the CHECKED_OUT -> MAINTENANCE edge in the SDD state machine
-   (Figure 6) rather than a new workflow.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -53,7 +44,7 @@
           state.condition = a.condition;
           state.step = 2;
         }
-      }).catch(function () { /* fall back to the picker */ });
+      }).catch(function () {  });
     }
   }).then(render).catch(function (err) {
     UI.qs('#stepBody').innerHTML = '<div class="card__body"><div class="alert alert--danger">'
@@ -77,8 +68,6 @@
     if (state.step === 3) { return renderReview(); }
     return renderDone();
   }
-
-  /* -------- step 1 -------------------------------------------------------- */
 
   function renderPick() {
     UI.qs('#stepBody').innerHTML = ''
@@ -123,8 +112,6 @@
     });
   }
 
-  /* -------- step 2 -------------------------------------------------------- */
-
   function renderDetails() {
     var a = state.asset;
     UI.qs('#stepBody').innerHTML = ''
@@ -168,8 +155,6 @@
       render();
     });
   }
-
-  /* -------- step 3 -------------------------------------------------------- */
 
   function renderReview() {
     var a = state.asset;
@@ -244,8 +229,6 @@
       });
     });
   }
-
-  /* -------- step 4 -------------------------------------------------------- */
 
   function renderDone() {
     var a = state.result.asset;

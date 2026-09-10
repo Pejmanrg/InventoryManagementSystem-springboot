@@ -9,7 +9,6 @@ import com.solarintegrators.inventory.dto.request.CreateInventoryItemRequest;
 import com.solarintegrators.inventory.dto.response.AdjustmentResponse;
 import com.solarintegrators.inventory.dto.response.InventoryItemResponse;
 import com.solarintegrators.inventory.exception.DuplicateResourceException;
-import com.solarintegrators.inventory.exception.InsufficientStockException;
 import com.solarintegrators.inventory.exception.InvalidRequestException;
 import com.solarintegrators.inventory.exception.ResourceNotFoundException;
 import com.solarintegrators.inventory.model.AuditOutcome;
@@ -19,15 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageRequest;
 
-/**
- * Quantity-managed stock.
- *
- * <p>Covers TC-06 (adjustment) and TC-09 (adjustment below zero) - the second
- * being the boundary case the SDD records as implemented but not yet
- * executed.</p>
- */
 class InventoryServiceTest extends AbstractIntegrationTest {
-
     @Test
     @DisplayName("TC-06: an adjustment of -50 against 500 leaves 450")
     void adjustsQuantityDownwards() {
@@ -61,7 +52,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> inventoryService.adjustQuantity(item.inventoryItemId(),
                 new AdjustQuantityRequest(new BigDecimal("-600"), "ISSUE_TO_JOB", null, null)))
-                .isInstanceOf(InsufficientStockException.class)
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("cannot be negative");
 
         // The critical assertion: the rejection left the balance alone.
@@ -87,7 +78,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> inventoryService.adjustQuantity(item.inventoryItemId(),
                 new AdjustQuantityRequest(new BigDecimal("-600"), "ISSUE_TO_JOB", null, null)))
-                .isInstanceOf(InsufficientStockException.class);
+                .isInstanceOf(IllegalStateException.class);
 
         assertThat(auditEventRepository.findAll())
                 .anySatisfy(event -> {

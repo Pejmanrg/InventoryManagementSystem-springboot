@@ -15,19 +15,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Stock managed by quantity rather than by individual tag: connectors, wire,
- * rail, clamps, consumables.
- *
- * <p>Converted from the Module 2 console prototype. {@code quantityOnHand}
- * remains a {@link BigDecimal} so that length- and weight-based items can be
- * tracked, and the non-negative rule enforced by {@code InventoryService} is
- * reinforced by a check constraint on the table.</p>
- */
 @Entity
 @Table(name = "inventory_items")
 public class InventoryItem {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "inventory_item_id", nullable = false, updatable = false)
@@ -42,14 +32,12 @@ public class InventoryItem {
     @Column(name = "category", length = 64)
     private String category;
 
-    /** Unit of measure: EA, PR, FT, PK. */
     @Column(name = "unit_of_measure", length = 16)
     private String unitOfMeasure;
 
     @Column(name = "quantity_on_hand", nullable = false, precision = 18, scale = 4)
     private BigDecimal quantityOnHand = BigDecimal.ZERO;
 
-    /** Level at or below which the item appears on the low-stock report. */
     @Column(name = "reorder_point", precision = 18, scale = 4)
     private BigDecimal reorderPoint = BigDecimal.ZERO;
 

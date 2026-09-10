@@ -1,11 +1,3 @@
-/* ==========================================================================
-   pages/maintenance.js - Screen 10: Maintenance
-   --------------------------------------------------------------------------
-   Maps to MaintenanceService.createWorkOrder(), updateWorkOrder(), and
-   closeWorkOrder() (CSC-05 Maintenance & Purchasing). Opening a corrective
-   work order can take an asset out of service; closing the last open work
-   order can return it to service. Both directions are confirmed first.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -152,8 +144,6 @@
     return out;
   }
 
-  /* --------------------------------------------------------- close a WO */
-
   function closeWorkOrder(w) {
     var asset = assets.filter(function (a) { return a.assetId === w.assetId; })[0];
     var canReturn = asset && asset.status === D.AssetStatus.MAINTENANCE;
@@ -196,8 +186,6 @@
       UI.toast('Close failed', err.message, 'danger');
     });
   }
-
-  /* ---------------------------------------------------- create a new WO */
 
   function openCreate(presetAssetId) {
     var selectable = assets.filter(function (a) { return a.status !== D.AssetStatus.RETIRED; });
@@ -272,8 +260,6 @@
       UI.toast('Could not create work order', err.message, 'danger');
     });
   }
-
-  /* -------------------------------------------------------------- wiring */
 
   var newBtn = UI.qs('#newBtn');
   if (newBtn) { newBtn.addEventListener('click', function () { openCreate(null); }); }

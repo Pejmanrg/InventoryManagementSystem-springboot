@@ -1,11 +1,3 @@
-/* ==========================================================================
-   pages/admin.js - Screen 12: Administration (users, roles, lookups,
-                    integrations)
-   --------------------------------------------------------------------------
-   Maps to UserRoleService.assignRole() / removeRole() (CSC-06) and the
-   External Integration Gateway settings (CSC-13). Role changes are
-   confirmed, then written to the audit history.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -58,17 +50,11 @@
   loadLookups();
   loadIntegrations();
 
-  /* --------------------------------------------------------------- users */
-
   function loadUsers() {
     API.admin.users().then(function (users) {
       UI.qs('#userCount').textContent = users.length + (users.length === 1 ? ' account' : ' accounts');
 
       if (!users.length) {
-        /* Not an error state. The table starts empty and sign-in is still
-           working, because the server falls back to the break-glass accounts in
-           its configuration. Saying so is the whole point of this message: an
-           administrator who does not know that will not know to leave it. */
         UI.qs('#usersHost').innerHTML = UI.emptyState(
           'No accounts yet',
           'You are signed in with a break-glass account defined in the server configuration. '
@@ -119,9 +105,6 @@
     });
   }
 
-  /* ------------------------------------------------------- create account */
-
-  /** A .field wrapper, so UI.setFieldError can find and mark the input. */
   function field(name, label, control, hint) {
     return '<div class="field"><label class="field__label" for="f_' + name + '">' + UI.esc(label) + '</label>'
       + control
@@ -134,16 +117,7 @@
       + ' value="' + UI.esc(value || '') + '" autocomplete="off">';
   }
 
-  /**
-   * Creates an account.
-   *
-   * <p>Takes an optional prefill so a rejected attempt - a username already in
-   * use, a password below the server's minimum - can be reopened with what was
-   * typed still in it. Losing six fields to a 409 is the kind of small cruelty
-   * that makes people stop using a screen.</p>
-   */
   function createUser(prefill) {
-    /* Called both directly and as a click handler, where the argument is an Event. */
     if (!prefill || typeof prefill.preventDefault === 'function') { prefill = {}; }
 
     UI.modal({
@@ -191,9 +165,6 @@
     }).then(function (payload) {
       if (!payload) { return; }
 
-      /* Two-argument then, not then().catch(): a catch here would also swallow
-         failures from the success branch, and "account created" must not be
-         reported as "account not created" because the follow-up broke. */
       return API.admin.createUser(payload).then(function (created) {
         return invite(created);
       }, function (err) {
@@ -203,15 +174,11 @@
     });
   }
 
-  /** Issues the first link for a freshly created account. */
   function invite(created) {
     return API.admin.invite(created.userId, 'INVITE').then(function (invitation) {
       loadUsers();
       showInvitation(created, invitation);
     }, function (err) {
-      /* The account exists and only the invitation failed. Saying so precisely
-         matters - told "it failed", an administrator creates it again and hits
-         a duplicate-username error they cannot explain. */
       loadUsers();
       UI.showFormError('Account ' + created.username + ' was created, but the invitation could '
         + 'not be issued: ' + err.message + ' Open the account and send it again.');
@@ -252,8 +219,6 @@
     });
   }
 
-  /* ------------------------------------------------------- enable/disable */
-
   function toggleStatus(u) {
     var disabling = u.active;
     UI.confirm({
@@ -280,8 +245,6 @@
     }).catch(function (err) { UI.showFormError(err.message); });
   }
 
-  /* -------------------------------------------------- role capabilities */
-
   function renderRoles() {
     UI.qs('#rolesHost').innerHTML = Object.keys(D.ROLES).map(function (key) {
       var r = D.ROLES[key];
@@ -294,8 +257,6 @@
     + '<p class="prototype-note">The interface hides functions a role cannot use. The server repeats every '
     + 'check because hiding a button is not an authorization control.</p>';
   }
-
-  /* ------------------------------------------------------------ lookups */
 
   function loadLookups() {
     API.admin.lookups().then(function (l) {
@@ -314,8 +275,6 @@
       + values.map(function (v) { return '<span class="pill">' + UI.esc(v) + '</span> '; }).join('')
       + '</div></div>';
   }
-
-  /* ------------------------------------------------------- integrations */
 
   function loadIntegrations() {
     API.admin.integrations().then(function (list) {

@@ -1,10 +1,3 @@
-/* ==========================================================================
-   pages/inventory.js - Screen 8: Inventory list
-   --------------------------------------------------------------------------
-   Quantity-managed stock. Maps to InventoryService.getStock() and the
-   inventory side of CSC-03. Reorder point drives the stock-state badge and
-   feeds ReportService.lowStock().
-   ========================================================================== */
 
 (function () {
   'use strict';

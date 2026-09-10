@@ -12,18 +12,9 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * A person who can hold custody of an asset.
- *
- * <p>{@code externalHrId} is the placeholder for the later HR integration
- * (CSC-13): once employee records are synchronised, that column carries the
- * source system's stable identifier and this table stops being maintained by
- * hand. Only assignment-relevant fields are stored - no wider HR data.</p>
- */
 @Entity
 @Table(name = "employees")
 public class Employee {
-
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "employee_id", nullable = false, updatable = false)

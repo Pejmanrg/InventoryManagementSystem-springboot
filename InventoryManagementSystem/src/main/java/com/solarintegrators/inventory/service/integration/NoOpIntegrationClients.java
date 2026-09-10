@@ -9,18 +9,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Do-nothing implementations of the Phase 3 integration boundaries.
- *
- * <p>They log at debug and return zero. This keeps the application startable and
- * the wiring honest while the real clients do not exist: a caller that starts
- * using one of these interfaces gets a working object, not a
- * {@code NullPointerException}, and the {@code @ConditionalOnMissingBean}
- * guards mean a real implementation replaces the stub simply by existing.</p>
- */
 @Configuration
 public class NoOpIntegrationClients {
-
     private static final Logger log = LoggerFactory.getLogger(NoOpIntegrationClients.class);
 
     @Bean

@@ -11,38 +11,22 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Sort;
 
-/**
- * Writes and reads the audit trail (CSC-12 Audit &amp; Monitoring).
- *
- * <p>Every inventory-changing action calls {@link #record}. Rejected attempts
- * call it too, with {@link AuditOutcome#DENIED} - a log of only what succeeded
- * cannot answer whether someone tried.</p>
- *
- * <p>Denied events are written in a {@code REQUIRES_NEW} transaction. The
- * business transaction that rejected the action is about to roll back, and the
- * record that it was attempted must survive that rollback.</p>
- */
 @Service
 public class AuditService {
-
     private final AuditEventRepository auditEventRepository;
 
     public AuditService(AuditEventRepository auditEventRepository) {
         this.auditEventRepository = auditEventRepository;
     }
 
-    /** Records a successful action in the caller's transaction. */
     @Transactional(propagation = Propagation.MANDATORY)
-    public AuditEvent record(String action, String entityType, Object entityId, String summary) {
+    public AuditEvent recordEvent(String action, String entityType, Object entityId, String summary) {
         return auditEventRepository.save(new AuditEvent(
                 currentActor(), action, entityType, asText(entityId), truncate(summary), AuditOutcome.SUCCESS));
     }
 
-    /**
-     * Records a rejected action in its own transaction so it survives the
-     * rollback of the business transaction that refused the request.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AuditEvent recordDenied(String action, String entityType, Object entityId, String summary) {
         return auditEventRepository.save(new AuditEvent(
@@ -50,7 +34,7 @@ public class AuditService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<AuditEventResponse> search(String entityId, Pageable pageable) {
+    public PageResponse<AuditEventResponse> searchEvents(String entityId, Pageable pageable) {
         if (entityId != null && !entityId.isBlank()) {
             return PageResponse.of(
                     auditEventRepository.findByEntityIdOrderByOccurredAtDesc(entityId, pageable),
@@ -61,10 +45,27 @@ public class AuditService {
                 AuditEventResponse::from);
     }
 
-    /**
-     * Username of the signed-in principal, or {@code system} for scheduled jobs
-     * and integration callbacks that run without a user.
-     */
+    @Transactional(readOnly = true)
+    public String exportAudit() {
+        StringBuilder csv = new StringBuilder("occurredAt,actor,action,entityType,entityId,outcome,summary\n");
+        for (AuditEvent event : auditEventRepository.findAll(Sort.by(Sort.Direction.DESC, "occurredAt"))) {
+            csv.append(event.getOccurredAt()).append(',')
+               .append(quote(event.getActor())).append(',')
+               .append(quote(event.getAction())).append(',')
+               .append(quote(event.getEntityType())).append(',')
+               .append(quote(event.getEntityId())).append(',')
+               .append(event.getOutcome()).append(',')
+               .append(quote(event.getSummary())).append('\n');
+        }
+        return csv.toString();
+    }
+
+    // A comma or a quote inside a summary would otherwise shift every later column.
+    private static String quote(String value) {
+        if (value == null) return "";
+        return '"' + value.replace("\"", "\"\"") + '"';
+    }
+
     public String currentActor() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -78,7 +79,6 @@ public class AuditService {
         return entityId == null ? null : String.valueOf(entityId);
     }
 
-    /** The summary column is 500 characters; a long note must not fail the write. */
     private static String truncate(String summary) {
         if (summary == null) {
             return "";

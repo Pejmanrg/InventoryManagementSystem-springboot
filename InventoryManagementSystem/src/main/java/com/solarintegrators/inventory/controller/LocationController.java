@@ -16,32 +16,27 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Locations. Reference data, so the list is returned unpaged. */
 @RestController
 @RequestMapping("/api/locations")
 public class LocationController {
-
     private final LocationService locationService;
 
     public LocationController(LocationService locationService) {
         this.locationService = locationService;
     }
 
-    /** GET /api/locations */
     @GetMapping
     @PreAuthorize("hasAnyRole('FIELD','MANAGER','FINANCE','ADMIN')")
     public List<LocationResponse> listLocations() {
         return locationService.listLocations();
     }
 
-    /** GET /api/locations/{id} */
     @GetMapping("/{locationId}")
     @PreAuthorize("hasAnyRole('FIELD','MANAGER','FINANCE','ADMIN')")
     public LocationResponse getLocation(@PathVariable UUID locationId) {
         return locationService.getLocation(locationId);
     }
 
-    /** POST /api/locations */
     @PostMapping
     @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
     public ResponseEntity<LocationResponse> createLocation(@Valid @RequestBody CreateLocationRequest request) {

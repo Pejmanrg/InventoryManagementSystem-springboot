@@ -1,16 +1,3 @@
-/* ==========================================================================
-   pages/set-password.js - Redeeming an invitation or reset link
-   --------------------------------------------------------------------------
-   The only screen besides sign-in that runs with no session, and the only one
-   that must: everybody who reaches it is a person who cannot sign in.
-
-   It deliberately does not call UI.mountShell(). That helper calls
-   Auth.require(), which redirects anyone without a session back to the login
-   page - which is precisely where this page's visitors would be stuck.
-
-   The token is the whole credential, so the page shows only what the token
-   holder already knows: their own name and username, from GET /api/invitations.
-   ========================================================================== */
 
 (function () {
   'use strict';
@@ -38,8 +25,6 @@
   API.invitations.check(token).then(renderForm).catch(function (err) {
     panel.innerHTML = BRAND + problem('This link cannot be used', err.message);
   });
-
-  /* ----------------------------------------------------------------- form */
 
   function renderForm(info) {
     var invite = info.purpose === 'INVITE';
@@ -84,8 +69,6 @@
     var value = document.getElementById('newPassword').value;
     var again = document.getElementById('confirmPassword').value;
 
-    /* Checked here for a fast answer, and again on the server because this
-       check is a courtesy and the server's is the control. */
     if (value.length < 10) {
       UI.setFieldError('newPassword', 'Use at least 10 characters.', panel);
       return;
@@ -110,8 +93,6 @@
     button.disabled = busy;
     button.textContent = busy ? 'Saving…' : 'Set password and continue';
   }
-
-  /* ------------------------------------------------------------ outcomes */
 
   function succeeded(info) {
     return ''
