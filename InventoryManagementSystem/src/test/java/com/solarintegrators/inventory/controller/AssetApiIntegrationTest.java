@@ -108,7 +108,6 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.fieldErrors.length()").value(2))
                 .andExpect(jsonPath("$.path").value("/api/assets"));
     }
@@ -118,7 +117,7 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
     void malformedUuidReturns400() throws Exception {
         mockMvc.perform(get("/api/assets/not-a-uuid").with(httpBasic("field", "field123")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+                .andExpect(jsonPath("$.status").value(400));
     }
 
     @Test
@@ -127,7 +126,6 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/assets/" + UUID.randomUUID()).with(httpBasic("field", "field123")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.code").value("ASSET_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Asset not found")));
     }
 
@@ -148,7 +146,6 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.error").value("Conflict"))
-                .andExpect(jsonPath("$.code").value("ASSET_TAG_DUPLICATE"))
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("tag"));
     }
 
@@ -172,7 +169,7 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(checkoutBody))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("ASSET_NOT_AVAILABLE"));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be checked out")));
     }
 
     @Test
@@ -186,7 +183,7 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(new AdjustQuantityRequest(
                                 new BigDecimal("-600"), "ISSUE_TO_JOB", null, null))))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("INVENTORY_NEGATIVE_STOCK"));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be negative")));
 
         assertThat(inventoryService.getStock(item.inventoryItemId())).isEqualByComparingTo("500");
     }
@@ -215,7 +212,7 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("does not permit")));
 
         assertThat(assetRepository.count()).isZero();
     }

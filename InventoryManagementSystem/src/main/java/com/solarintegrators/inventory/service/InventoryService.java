@@ -125,8 +125,9 @@ public class InventoryService {
             auditService.recordDenied("INVENTORY_ADJUST", "INVENTORY", itemId,
                     "Adjustment rejected - " + item.getSku() + " would fall below zero ("
                             + previous + " " + signed(delta) + ").");
-            throw new IllegalStateException("Insufficient stock for " + item.getSku()
-                    + ": on hand " + previous + ", requested " + delta + ".");
+            throw new IllegalStateException("Adjustment failed: stock cannot be negative. "
+                    + item.getSku() + " has " + previous + " on hand and the requested change is "
+                    + delta + ".");
         }
 
         item.setQuantityOnHand(updated);
