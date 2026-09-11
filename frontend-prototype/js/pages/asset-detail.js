@@ -15,7 +15,9 @@
     return;
   }
 
-  render();
+  // Locations first: the move dialog builds its destination list from them.
+  // Render either way - if the lookup fails, render() reports it properly.
+  API.reference.locations().then(render, render);
 
   function render() {
     page.innerHTML = UI.loading('Loading asset…');

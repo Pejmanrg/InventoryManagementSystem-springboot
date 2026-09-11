@@ -97,14 +97,11 @@
     { employeeId: 'emp-2010', externalHrId: 'HR-4611', name: 'Ben Whitaker',  title: 'Service Technician',    site: 'San Diego Warehouse',  status: 'ACTIVE' }
   ];
 
-  var LOCATIONS = [
-    { locationId: 'loc-100', code: 'WH-SD',    name: 'San Diego Warehouse',  type: 'WAREHOUSE', address: '2210 Kettner Blvd, San Diego, CA' },
-    { locationId: 'loc-200', code: 'YD-OTAY',  name: 'Otay Mesa Yard',       type: 'YARD',      address: '8410 Airway Rd, San Diego, CA' },
-    { locationId: 'loc-300', code: 'VAN-12',   name: 'Van 12 (Mobile)',      type: 'VEHICLE',   address: 'Mobile - assigned crew' },
-    { locationId: 'loc-400', code: 'SITE-RIV', name: 'Riverside Solar Site', type: 'JOB_SITE',  address: '1400 Iowa Ave, Riverside, CA' },
-    { locationId: 'loc-500', code: 'HQ',       name: 'Corporate Office',     type: 'OFFICE',    address: '5030 Camino Ruiz, San Diego, CA' },
-    { locationId: 'loc-600', code: 'VAN-07',   name: 'Van 07 (Mobile)',      type: 'VEHICLE',   address: 'Mobile - assigned crew' }
-  ];
+  // Filled in at runtime from GET /api/locations by API.reference.locations().
+  // Deliberately empty: the ids that used to be here were prototype strings
+  // like 'loc-100', and anything submitted from a dropdown built on them was
+  // rejected by the API, which expects a UUID.
+  var LOCATIONS = [];
 
   var CATEGORIES = [
     { code: 'IT',      name: 'IT Equipment' },

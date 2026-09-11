@@ -32,7 +32,10 @@
 
   var preselect = UI.param('assetId');
 
-  API.assets.list({ status: D.AssetStatus.CHECKED_OUT }).then(function (rows) {
+  // Locations first - see checkout.js for why.
+  API.reference.locations().then(function () {
+    return API.assets.list({ status: D.AssetStatus.CHECKED_OUT });
+  }).then(function (rows) {
     checkedOut = rows;
     if (preselect) {
       return API.assets.get(preselect).then(function (a) {
@@ -40,7 +43,7 @@
           UI.showFormError('Asset ' + a.tag + ' is not currently checked out. Current status: ' + a.status + '.', page);
         } else {
           state.asset = a;
-          state.locationId = 'loc-100';
+          state.locationId = a.locationId;
           state.condition = a.condition;
           state.step = 2;
         }
@@ -94,7 +97,7 @@
       UI.qsa('#pickList .pick').forEach(function (btn) {
         btn.addEventListener('click', function () {
           state.asset = list.filter(function (a) { return a.assetId === btn.dataset.id; })[0];
-          state.locationId = 'loc-100';
+          state.locationId = state.asset.locationId;
           state.condition = state.asset.condition;
           state.step = 2;
           UI.clearErrors(page);

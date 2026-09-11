@@ -38,7 +38,7 @@
     +     '<fieldset class="fieldset">'
     +       '<legend class="fieldset__legend">Assignment</legend>'
     +       '<div class="form-grid">'
-    +         selectField('locationId', 'Home location', UI.selectOptions(D.LOCATIONS, 'locationId', 'name', 'loc-100'))
+    +         selectField('locationId', 'Home location', '')
     +         selectField('condition', 'Condition', UI.selectOptions(D.CONDITIONS, null, null, 'NEW'))
     +       '</div>'
     +       '<div class="alert alert--info mt-4"><span class="alert__icon" aria-hidden="true">i</span>'
@@ -185,6 +185,13 @@
         UI.showFormError(err.message, page);
       }
     });
+  });
+
+  // The form is built before the API answers, so the home-location list is
+  // filled in when it arrives - empty until then, rather than offering ids the
+  // API would reject.
+  API.reference.locations().then(function (locs) {
+    UI.qs('#locationId').innerHTML = UI.selectOptions(locs, 'locationId', 'name');
   });
 
   UI.qs('#tag').focus();

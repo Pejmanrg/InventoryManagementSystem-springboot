@@ -59,7 +59,11 @@
 
   function load() {
     UI.qs('#tableHost').innerHTML = UI.loading('Loading inventory…');
-    Promise.all([API.inventory.list(filters), API.inventory.list({})]).then(function (r) {
+    API.reference.locations().then(function (locs) {
+      UI.qs('#fLocation').innerHTML =
+        UI.selectOptions(locs, 'locationId', 'name', filters.locationId, 'All locations');
+      return Promise.all([API.inventory.list(filters), API.inventory.list({})]);
+    }).then(function (r) {
       rows = r[0];
       renderTiles(r[1]);
       renderTable();

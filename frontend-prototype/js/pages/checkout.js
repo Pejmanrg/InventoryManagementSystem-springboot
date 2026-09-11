@@ -31,7 +31,11 @@
 
   var preselect = UI.param('assetId');
 
-  API.assets.list({ status: D.AssetStatus.AVAILABLE }).then(function (rows) {
+  // Locations first - the destination list is built from them, and sending a
+  // value the API cannot read as a UUID fails the whole check-out.
+  API.reference.locations().then(function () {
+    return API.assets.list({ status: D.AssetStatus.AVAILABLE });
+  }).then(function (rows) {
     available = rows;
     if (preselect) {
       return API.assets.get(preselect).then(function (a) {

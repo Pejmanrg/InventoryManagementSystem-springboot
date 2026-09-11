@@ -51,7 +51,11 @@
 
   function load() {
     UI.qs('#tableHost').innerHTML = UI.loading('Loading assets…');
-    API.assets.list(filters).then(function (result) {
+    API.reference.locations().then(function (locs) {
+      UI.qs('#fLocation').innerHTML =
+        UI.selectOptions(locs, 'locationId', 'name', filters.locationId, 'All locations');
+      return API.assets.list(filters);
+    }).then(function (result) {
       rows = result;
       renderTable();
     }).catch(function (err) {

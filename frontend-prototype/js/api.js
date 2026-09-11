@@ -849,6 +849,23 @@
     }
   };
 
+  /* =========================================================== REFERENCE */
+
+  /* Locations are a live lookup, not prototype data. The screens build their
+     dropdowns from MockData.LOCATIONS, which used to hold ids like "loc-100";
+     the API returns the same shape with real UUIDs, so loading once and
+     replacing the list fixes every dropdown without each screen needing to
+     know where the rows came from. */
+
+  var reference = {
+    locations: function () {
+      return locations().then(function (rows) {
+        global.MockData.LOCATIONS = rows;
+        return rows;
+      });
+    }
+  };
+
   /* ------------------------------------------------------------- exports */
 
   global.API = {
@@ -862,6 +879,7 @@
     reports: reports,
     admin: admin,
     audit: auditApi,
-    invitations: invitations
+    invitations: invitations,
+    reference: reference
   };
 })(window);
