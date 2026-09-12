@@ -268,6 +268,8 @@
     }).join('');
 
     var a = state.result.asset;
+    // A receipt should never blank the screen, so tolerate a missing transaction.
+    var txn = state.result.transaction || {};
     UI.qs('#stepBody').innerHTML = ''
       + '<div class="card__body">'
       +   '<div class="alert alert--success"><span class="alert__icon" aria-hidden="true">✓</span>'
@@ -275,8 +277,8 @@
       +     UI.esc(a.tag) + ' is now assigned to ' + UI.esc(a.custodianName) + ' at ' + UI.esc(a.locationName) + '.'
       +     '</div></div>'
       +   '<div class="dl mt-4">'
-      +     item('Transaction ID', state.result.transaction.transactionId)
-      +     item('Recorded at', UI.fmtDateTime(state.result.transaction.timestamp))
+      +     item('Transaction ID', txn.transactionId || 'Not recorded')
+      +     item('Recorded at', txn.timestamp ? UI.fmtDateTime(txn.timestamp) : '—')
       +     item('Recorded by', Auth.user().name)
       +   '</div>'
       +   '<div class="form-actions">'

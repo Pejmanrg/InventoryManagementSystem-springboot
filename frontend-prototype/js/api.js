@@ -267,13 +267,16 @@
     }
   };
 
+  // The lifecycle endpoints return the updated asset, not the transaction they
+  // wrote, but the check-out and check-in receipts need the transaction id. The
+  // history is newest first, so the first row is the one this call just created.
   function lifecycle(assetId, action, body) {
-    return Promise.all([
-      http('POST', '/api/assets/' + encodeURIComponent(assetId) + '/' + action, body || {}),
-      locations()
-    ]).then(function (r) {
-      return { asset: decorateAsset(r[0], r[1]), transaction: null };
-    });
+    return http('POST', '/api/assets/' + encodeURIComponent(assetId) + '/' + action, body || {})
+      .then(function (asset) {
+        return Promise.all([locations(), assets.history(assetId)]).then(function (r) {
+          return { asset: decorateAsset(asset, r[0]), transaction: r[1][0] || null };
+        });
+      });
   }
 
   var transactions = {

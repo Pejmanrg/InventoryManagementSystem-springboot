@@ -235,6 +235,8 @@
 
   function renderDone() {
     var a = state.result.asset;
+    // A receipt should never blank the screen, so tolerate a missing transaction.
+    var txn = state.result.transaction || {};
     var wo = state.result.workOrder;
 
     UI.qs('#stepBody').innerHTML = ''
@@ -247,8 +249,8 @@
             + '<div class="alert__body"><div class="alert__title">Work order ' + UI.esc(wo.number) + ' opened</div>'
             + UI.esc(wo.title) + '</div></div>' : '')
       +   '<div class="dl mt-4">'
-      +     item('Transaction ID', state.result.transaction.transactionId)
-      +     item('Recorded at', UI.fmtDateTime(state.result.transaction.timestamp))
+      +     item('Transaction ID', txn.transactionId || 'Not recorded')
+      +     item('Recorded at', txn.timestamp ? UI.fmtDateTime(txn.timestamp) : '—')
       +     item('Recorded by', Auth.user().name)
       +   '</div>'
       +   '<div class="form-actions">'
