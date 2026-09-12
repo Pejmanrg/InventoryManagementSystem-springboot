@@ -1,2 +1,5 @@
 
 Claude outputs/
+
+# Delivery packages - not part of the source
+*.zip
