@@ -384,11 +384,13 @@
         delta: d,
         reason: meta.reason,
         reference: meta.reference || null,
-        notes: meta.notes || null
+        notes: meta.notes || null,
+        employeeId: meta.employeeId || null
       }).then(function (r) {
         return {
           item: normaliseItem(r.item),
           previousQuantity: Number(r.previousQuantity),
+          employeeName: r.employeeName || '',
           adjustment: {
             adjustmentId: null,
             inventoryItemId: itemId,
@@ -398,6 +400,7 @@
             quantityAfter: Number(r.newQuantity),
             timestamp: nowIso(),
             performedBy: currentUserId(),
+            employeeName: r.employeeName || '',
             notes: meta.notes || ''
           }
         };
@@ -862,6 +865,28 @@
       return locations().then(function (rows) {
         global.MockData.LOCATIONS = rows;
         return rows;
+      });
+    },
+
+    /* Employees need reshaping as well as replacing: the API says active,
+       jobTitle and homeLocationName where the screens were written against
+       status, title and site. Mapping here keeps every screen working instead
+       of editing each one. */
+    employees: function () {
+      return employees().then(function (rows) {
+        global.MockData.EMPLOYEES = rows.map(function (e) {
+          return {
+            employeeId: e.employeeId,
+            externalHrId: e.externalHrId,
+            name: e.name,
+            email: e.email,
+            title: e.jobTitle,
+            site: e.homeLocationName,
+            homeLocationId: e.homeLocationId,
+            status: e.active ? 'ACTIVE' : 'INACTIVE'
+          };
+        });
+        return global.MockData.EMPLOYEES;
       });
     }
   };

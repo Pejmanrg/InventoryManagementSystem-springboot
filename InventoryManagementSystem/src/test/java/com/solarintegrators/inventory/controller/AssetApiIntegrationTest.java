@@ -181,7 +181,7 @@ class AssetApiIntegrationTest extends AbstractIntegrationTest {
                         .with(httpBasic("field", "field123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new AdjustQuantityRequest(
-                                new BigDecimal("-600"), "ISSUE_TO_JOB", null, null))))
+                                new BigDecimal("-600"), "ISSUE_TO_JOB", null, null, null))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("cannot be negative")));
 

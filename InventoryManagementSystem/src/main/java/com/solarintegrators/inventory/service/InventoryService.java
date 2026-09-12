@@ -8,8 +8,10 @@ import com.solarintegrators.inventory.dto.response.PageResponse;
 import com.solarintegrators.inventory.exception.DuplicateResourceException;
 import com.solarintegrators.inventory.exception.InvalidRequestException;
 import com.solarintegrators.inventory.exception.ResourceNotFoundException;
+import com.solarintegrators.inventory.model.Employee;
 import com.solarintegrators.inventory.model.InventoryItem;
 import com.solarintegrators.inventory.model.Location;
+import com.solarintegrators.inventory.repository.EmployeeRepository;
 import com.solarintegrators.inventory.repository.InventoryRepository;
 import com.solarintegrators.inventory.repository.InventorySpecifications;
 import com.solarintegrators.inventory.repository.LocationRepository;
@@ -26,13 +28,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class InventoryService {
     private final InventoryRepository inventoryRepository;
     private final LocationRepository locationRepository;
+    private final EmployeeRepository employeeRepository;
     private final AuditService auditService;
 
     public InventoryService(InventoryRepository inventoryRepository,
                             LocationRepository locationRepository,
+                            EmployeeRepository employeeRepository,
                             AuditService auditService) {
         this.inventoryRepository = inventoryRepository;
         this.locationRepository = locationRepository;
+        this.employeeRepository = employeeRepository;
         this.auditService = auditService;
     }
 
@@ -115,6 +120,18 @@ public class InventoryService {
             throw InvalidRequestException.required("reason", "An adjustment reason is required.");
         }
 
+        // Naming a person is optional, but if one is named the record has to be
+        // real, or the audit trail points at an employee who does not exist.
+        Employee employee = null;
+        if (request.employeeId() != null) {
+            employee = employeeRepository.findById(request.employeeId())
+                    .orElseThrow(() -> ResourceNotFoundException.employee(request.employeeId()));
+            if (!employee.isActive()) {
+                throw new IllegalStateException("Employee " + employee.getName()
+                        + " is not active and cannot receive or return stock.");
+            }
+        }
+
         InventoryItem item = inventoryRepository.findWithLockByInventoryItemId(itemId)
                 .orElseThrow(() -> ResourceNotFoundException.inventoryItem(itemId));
 
@@ -137,11 +154,14 @@ public class InventoryService {
         auditService.recordEvent("INVENTORY_ADJUST", "INVENTORY", itemId,
                 saved.getSku() + " adjusted by " + signed(delta) + " (" + previous + " to " + updated + ")"
                         + ", reason " + reason
+                        + (employee != null
+                                ? (delta.signum() < 0 ? ", issued to " : ", returned by ") + employee.getName()
+                                : "")
                         + (request.reference() != null && !request.reference().isBlank()
                                 ? ", reference " + request.reference() : "") + ".");
 
         return new AdjustmentResponse(InventoryItemResponse.from(saved), previous, delta, updated,
-                reason, request.reference());
+                reason, request.reference(), employee == null ? null : employee.getName());
     }
 
     public InventoryItemResponse setThreshold(UUID itemId, BigDecimal reorderPoint) {

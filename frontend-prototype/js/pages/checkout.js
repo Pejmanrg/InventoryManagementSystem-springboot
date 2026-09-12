@@ -19,9 +19,13 @@
     + '<div class="page-head">'
     +   '<div class="page-head__text">'
     +     '<h1>Check out asset</h1>'
-    +     '<div class="page-head__sub">Assign equipment to an employee and record the transaction.</div>'
+    +     '<div class="page-head__sub">Assign a single tracked asset to an employee. To issue a '
+    +       'quantity of a stocked item, use Issue stock instead.</div>'
     +   '</div>'
-    +   '<div class="page-head__actions"><a class="btn" href="assets.html">Asset list</a></div>'
+    +   '<div class="page-head__actions">'
+    +     '<a class="btn" href="inventory-adjust.html">Issue stock instead</a>'
+    +     '<a class="btn" href="assets.html">Asset list</a>'
+    +   '</div>'
     + '</div>'
     + '<div id="formBanner" class="mb-4"></div>'
     + '<section class="card">'
@@ -31,9 +35,9 @@
 
   var preselect = UI.param('assetId');
 
-  // Locations first - the destination list is built from them, and sending a
+  // Locations and employees first. Both dropdowns submit ids, and sending a
   // value the API cannot read as a UUID fails the whole check-out.
-  API.reference.locations().then(function () {
+  Promise.all([API.reference.locations(), API.reference.employees()]).then(function () {
     return API.assets.list({ status: D.AssetStatus.AVAILABLE });
   }).then(function (rows) {
     available = rows;

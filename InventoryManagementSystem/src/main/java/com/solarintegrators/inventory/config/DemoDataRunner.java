@@ -102,7 +102,7 @@ public class DemoDataRunner {
                 AdjustmentResponse adjusted = inventoryService.adjustQuantity(
                         connectors.inventoryItemId(),
                         new AdjustQuantityRequest(new BigDecimal("-50"), "ISSUE_TO_JOB",
-                                "JOB-2291", "Issued to Riverside array string work."));
+                                "JOB-2291", "Issued to Riverside array string work.", null));
                 log.info("   Stock after usage (-50): {}", adjusted.newQuantity());
 
                 log.info("=== Demonstration data seeded successfully ===");

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
+import java.util.UUID;
 
 public record AdjustQuantityRequest(
         @NotNull(message = "An adjustment quantity is required.")
@@ -14,5 +15,9 @@ public record AdjustQuantityRequest(
 
         @Size(max = 64) String reference,
 
-        @Size(max = 2000) String notes) {
+        @Size(max = 2000) String notes,
+
+        // Optional. On a decrease this is the employee receiving the stock; on
+        // an increase, the employee returning it. Recorded in the audit trail.
+        UUID employeeId) {
 }

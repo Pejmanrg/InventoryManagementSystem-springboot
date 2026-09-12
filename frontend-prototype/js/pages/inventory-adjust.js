@@ -13,6 +13,7 @@
 
   var D = window.MockData;
   var items = [];
+  var employees = [];
   var selected = null;
 
   page.innerHTML = ''
@@ -38,8 +39,13 @@
     +   '</div>'
     + '</div>';
 
-  Promise.all([API.inventory.list({}), API.inventory.adjustments(null, 8)]).then(function (r) {
+  Promise.all([
+    API.inventory.list({}),
+    API.inventory.adjustments(null, 8),
+    API.reference.employees()
+  ]).then(function (r) {
     items = r[0];
+    employees = r[2].filter(function (e) { return e.status === 'ACTIVE'; });
     renderForm();
     renderRecent(r[1]);
 
@@ -92,6 +98,17 @@
       +       '<span class="field__error" role="alert"><span aria-hidden="true">✕</span><span class="msg"></span></span>'
       +     '</div>'
       +     '<div class="field">'
+      +       '<label class="field__label" for="employeeId">Employee</label>'
+      +       '<select id="employeeId" name="employeeId">'
+      +         '<option value="">Not recorded</option>'
+      +         employees.map(function (e) {
+                  return '<option value="' + UI.esc(e.employeeId) + '">' + UI.esc(e.name)
+                    + (e.site ? ' — ' + UI.esc(e.site) : '') + '</option>';
+                }).join('')
+      +       '</select>'
+      +       '<span class="field__hint" id="employeeHint">Who is receiving the stock.</span>'
+      +     '</div>'
+      +     '<div class="field">'
       +       '<label class="field__label" for="reference">Reference</label>'
       +       '<input type="text" id="reference" name="reference" placeholder="JOB-2291 or PO-8841">'
       +       '<span class="field__hint">Job, purchase order, or cycle-count number.</span>'
@@ -113,8 +130,20 @@
 
     UI.qs('#itemId').addEventListener('change', onItemChange);
     UI.qs('#amount').addEventListener('input', renderPreview);
-    UI.qs('#direction').addEventListener('change', renderPreview);
+    UI.qs('#direction').addEventListener('change', function () {
+      onDirectionChange();
+      renderPreview();
+    });
     UI.qs('#adjForm').addEventListener('submit', onSubmit);
+    onDirectionChange();
+  }
+
+  // The employee means different things in each direction, so the hint changes
+  // with the direction rather than trying to cover both cases at once.
+  function onDirectionChange() {
+    UI.qs('#employeeHint').textContent = Number(UI.qs('#direction').value) < 0
+      ? 'Who is receiving the stock.'
+      : 'Who is returning the stock.';
   }
 
   function onItemChange() {
@@ -238,6 +267,9 @@
     var reasonLabel = D.ADJUSTMENT_REASONS.filter(function (r) { return r.code === reason; })[0].label;
     var reference = UI.qs('#reference').value.trim();
 
+    var employeeId = UI.qs('#employeeId').value;
+    var employee = employees.filter(function (e) { return e.employeeId === employeeId; })[0] || null;
+
     UI.confirm({
       title: 'Confirm inventory adjustment',
       message: 'Quantity changes are permanent and are written to the audit history with your user name.',
@@ -246,6 +278,8 @@
         { label: 'Change', value: (delta > 0 ? '+' : '') + delta + ' ' + selected.uom },
         { label: 'On hand after', value: UI.fmtNumber(after) + ' ' + selected.uom },
         { label: 'Reason', value: reasonLabel },
+        { label: (delta < 0 ? 'Issued to' : 'Returned by'),
+          value: employee ? employee.name : 'Not recorded' },
         { label: 'Reference', value: reference || '—' }
       ],
       warning: after === 0 ? 'This item will be left with zero quantity on hand.' : '',
@@ -259,11 +293,15 @@
       return API.inventory.adjust(selected.inventoryItemId, delta, {
         reason: reason,
         reference: reference,
-        notes: UI.qs('#notes').value.trim()
+        notes: UI.qs('#notes').value.trim(),
+        employeeId: employeeId || null
       }).then(function (result) {
         UI.toast('Adjustment posted',
           result.item.sku + ': ' + result.previousQuantity + ' → ' + result.item.quantityOnHand
-          + ' ' + result.item.uom + '.', 'success');
+          + ' ' + result.item.uom
+          + (result.employeeName
+              ? (delta < 0 ? ', issued to ' : ', returned by ') + result.employeeName : '')
+          + '.', 'success');
 
         return Promise.all([API.inventory.list({}), API.inventory.adjustments(null, 8)]).then(function (r) {
           items = r[0];

@@ -8,5 +8,6 @@ public record AdjustmentResponse(
         BigDecimal delta,
         BigDecimal newQuantity,
         String reason,
-        String reference) {
+        String reference,
+        String employeeName) {
 }

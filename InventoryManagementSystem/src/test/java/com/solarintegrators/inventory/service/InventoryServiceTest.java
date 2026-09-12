@@ -26,7 +26,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
 
         AdjustmentResponse result = inventoryService.adjustQuantity(item.inventoryItemId(),
                 new AdjustQuantityRequest(new BigDecimal("-50"), "ISSUE_TO_JOB", "JOB-2291",
-                        "Issued to Riverside array string work."));
+                        "Issued to Riverside array string work.", null));
 
         assertThat(result.previousQuantity()).isEqualByComparingTo("500");
         assertThat(result.newQuantity()).isEqualByComparingTo("450");
@@ -40,7 +40,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("500"));
 
         AdjustmentResponse result = inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("2000"), "RECEIPT", "PO-8841", null));
+                new AdjustQuantityRequest(new BigDecimal("2000"), "RECEIPT", "PO-8841", null, null));
 
         assertThat(result.newQuantity()).isEqualByComparingTo("2500");
     }
@@ -51,7 +51,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("500"));
 
         assertThatThrownBy(() -> inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("-600"), "ISSUE_TO_JOB", null, null)))
+                new AdjustQuantityRequest(new BigDecimal("-600"), "ISSUE_TO_JOB", null, null, null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("cannot be negative");
 
@@ -65,7 +65,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("40"));
 
         AdjustmentResponse result = inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("-40"), "ISSUE_TO_JOB", "JOB-2280", null));
+                new AdjustQuantityRequest(new BigDecimal("-40"), "ISSUE_TO_JOB", "JOB-2280", null, null));
 
         assertThat(result.newQuantity()).isEqualByComparingTo("0");
         assertThat(result.item().stockState()).isEqualTo("CRITICAL");
@@ -77,7 +77,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("500"));
 
         assertThatThrownBy(() -> inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("-600"), "ISSUE_TO_JOB", null, null)))
+                new AdjustQuantityRequest(new BigDecimal("-600"), "ISSUE_TO_JOB", null, null, null)))
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(auditEventRepository.findAll())
@@ -93,7 +93,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("500"));
 
         inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("-50"), "ISSUE_TO_JOB", "JOB-2291", null));
+                new AdjustQuantityRequest(new BigDecimal("-50"), "ISSUE_TO_JOB", "JOB-2291", null, null));
 
         assertThat(auditEventRepository.findAll())
                 .anySatisfy(event -> {
@@ -109,7 +109,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("500"));
 
         assertThatThrownBy(() -> inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(BigDecimal.ZERO, "CYCLE_COUNT", null, null)))
+                new AdjustQuantityRequest(BigDecimal.ZERO, "CYCLE_COUNT", null, null, null)))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("other than zero");
     }
@@ -120,7 +120,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         InventoryItemResponse item = givenStockedItem(new BigDecimal("500"));
 
         assertThatThrownBy(() -> inventoryService.adjustQuantity(item.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("-1"), "  ", null, null)))
+                new AdjustQuantityRequest(new BigDecimal("-1"), "  ", null, null, null)))
                 .isInstanceOf(InvalidRequestException.class)
                 .hasMessageContaining("reason is required");
     }
@@ -129,7 +129,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
     @DisplayName("Adjusting an unknown item is a not-found error")
     void rejectsAdjustmentOfUnknownItem() {
         assertThatThrownBy(() -> inventoryService.adjustQuantity(UUID.randomUUID(),
-                new AdjustQuantityRequest(new BigDecimal("-1"), "ISSUE_TO_JOB", null, null)))
+                new AdjustQuantityRequest(new BigDecimal("-1"), "ISSUE_TO_JOB", null, null, null)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -152,7 +152,7 @@ class InventoryServiceTest extends AbstractIntegrationTest {
         assertThat(healthy.stockState()).isEqualTo("OK");
 
         AdjustmentResponse low = inventoryService.adjustQuantity(healthy.inventoryItemId(),
-                new AdjustQuantityRequest(new BigDecimal("-350"), "ISSUE_TO_JOB", null, null));
+                new AdjustQuantityRequest(new BigDecimal("-350"), "ISSUE_TO_JOB", null, null, null));
         assertThat(low.item().stockState()).isEqualTo("LOW");
     }
 
