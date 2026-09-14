@@ -14,10 +14,9 @@
   };
   var rows = [];
 
-  var CATEGORIES = D.INVENTORY.reduce(function (acc, i) {
-    if (acc.indexOf(i.category) === -1) { acc.push(i.category); }
-    return acc;
-  }, []).sort();
+  // Built from whatever the API actually returns, so the filter can never
+  // offer a category that no stocked item uses.
+  var CATEGORIES = [];
 
   page.innerHTML = ''
     + '<div class="page-head">'

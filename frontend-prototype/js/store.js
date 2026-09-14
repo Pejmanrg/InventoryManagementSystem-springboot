@@ -2,7 +2,6 @@
 (function (global) {
   'use strict';
 
-  var STATE_KEY   = 'cims.state.v1';
   var SESSION_KEY = 'cims.session.v1';
 
   var memory = {};
@@ -42,56 +41,6 @@
     return JSON.parse(JSON.stringify(value));
   }
 
-  function seed() {
-    var d = global.MockData;
-    return {
-      assets:        clone(d.ASSETS),
-      inventory:     clone(d.INVENTORY),
-      transactions:  clone(d.TRANSACTIONS),
-      adjustments:   clone(d.ADJUSTMENTS),
-      workOrders:    clone(d.WORK_ORDERS),
-      users:         clone(d.USERS),
-      audit:         clone(d.AUDIT),
-      integrations:  clone(d.INTEGRATIONS),
-      purchaseOrders:clone(d.PURCHASE_ORDERS),
-      seq: 100
-    };
-  }
-
-  var state = null;
-
-  function load() {
-    if (state) { return state; }
-    var raw = readRaw(STATE_KEY);
-    if (raw) {
-      try {
-        state = JSON.parse(raw);
-        if (state && state.assets && state.assets.length) { return state; }
-      } catch (e) {  }
-    }
-    state = seed();
-    persist();
-    return state;
-  }
-
-  function persist() {
-    if (!state) { return; }
-    try { writeRaw(STATE_KEY, JSON.stringify(state)); } catch (e) {  }
-  }
-
-  function reset() {
-    state = seed();
-    persist();
-    return state;
-  }
-
-  function nextId(prefix) {
-    var s = load();
-    s.seq += 1;
-    persist();
-    return prefix + '-' + String(s.seq).padStart(4, '0');
-  }
-
   function getSession() {
     var raw = readRaw(SESSION_KEY);
     if (!raw) { return null; }
@@ -107,10 +56,6 @@
   }
 
   global.Store = {
-    load: load,
-    persist: persist,
-    reset: reset,
-    nextId: nextId,
     clone: clone,
     getSession: getSession,
     setSession: setSession,

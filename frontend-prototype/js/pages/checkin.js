@@ -237,7 +237,6 @@
     var a = state.result.asset;
     // A receipt should never blank the screen, so tolerate a missing transaction.
     var txn = state.result.transaction || {};
-    var wo = state.result.workOrder;
 
     UI.qs('#stepBody').innerHTML = ''
       + '<div class="card__body">'
@@ -245,9 +244,6 @@
       +     '<div class="alert__body"><div class="alert__title">Check-in complete</div>'
       +     UI.esc(a.tag) + ' is now ' + UI.esc(a.status) + ' at ' + UI.esc(a.locationName) + '.'
       +     '</div></div>'
-      +   (wo ? '<div class="alert alert--warning mt-4"><span class="alert__icon" aria-hidden="true">⚙</span>'
-            + '<div class="alert__body"><div class="alert__title">Work order ' + UI.esc(wo.number) + ' opened</div>'
-            + UI.esc(wo.title) + '</div></div>' : '')
       +   '<div class="dl mt-4">'
       +     item('Transaction ID', txn.transactionId || 'Not recorded')
       +     item('Recorded at', txn.timestamp ? UI.fmtDateTime(txn.timestamp) : '—')

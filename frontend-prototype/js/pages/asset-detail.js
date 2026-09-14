@@ -24,11 +24,9 @@
 
     Promise.all([
       API.assets.get(assetId),
-      API.assets.history(assetId),
-      API.maintenance.list({})
+      API.assets.history(assetId)
     ]).then(function (r) {
       var a = r[0], history = r[1];
-      var workOrders = r[2].filter(function (w) { return w.assetId === assetId; });
 
       page.innerHTML = ''
         + '<div class="breadcrumb"><a href="assets.html">Assets</a><span>/</span>' + UI.esc(a.tag) + '</div>'
@@ -48,7 +46,6 @@
         +   '</div>'
         +   '<div class="stack">'
         +     custodyCard(a)
-        +     workOrderCard(workOrders)
         +   '</div>'
         + '</div>';
 
@@ -117,22 +114,6 @@
       + '</div></section>';
   }
 
-  function workOrderCard(list) {
-    return '<section class="card"><div class="card__head"><h2>Maintenance</h2>'
-      + '<div class="spacer"></div>'
-      + (Auth.can('maintenance.create')
-          ? '<a class="btn btn--sm" href="maintenance.html?assetId=' + UI.esc(assetId) + '&new=1">New work order</a>' : '')
-      + '</div><div class="card__body card__body--flush">'
-      + (list.length
-        ? '<ul class="timeline">' + list.map(function (w) {
-            return '<li><span class="timeline__body"><strong>' + UI.esc(w.number) + '</strong> '
-              + UI.badge(w.status) + '<div class="xsmall subtle">' + UI.esc(w.title) + '</div></span>'
-              + '<span class="timeline__when">' + UI.esc(UI.fmtDate(w.dueDate)) + '</span></li>';
-          }).join('') + '</ul>'
-        : UI.emptyState('No work orders', 'This asset has no maintenance history recorded.'))
-      + '</div></section>';
-  }
-
   function renderActions(a) {
     var buttons = [];
 
@@ -147,6 +128,9 @@
     }
     if (a.status === S.LOST && Auth.can('asset.recover')) {
       buttons.push('<button class="btn" type="button" data-act="recover">Mark recovered</button>');
+    }
+    if (a.status === S.MAINTENANCE && Auth.can('asset.recover')) {
+      buttons.push('<button class="btn btn--primary" type="button" data-act="recover">Return to service</button>');
     }
     if ([S.AVAILABLE, S.CHECKED_OUT, S.MAINTENANCE].indexOf(a.status) !== -1 && Auth.can('asset.edit')) {
       buttons.push('<button class="btn" type="button" data-act="lost">Report lost</button>');
@@ -169,16 +153,21 @@
     if (action === 'move') { return openMove(a); }
 
     if (action === 'recover') {
+      // The same API call serves both cases: a lost asset that turned up, and
+      // one coming back from repair. Only the wording differs.
+      var fromMaintenance = a.status === S.MAINTENANCE;
       return UI.confirm({
-        title: 'Mark asset recovered',
+        title: fromMaintenance ? 'Return asset to service' : 'Mark asset recovered',
         message: 'This returns the asset to AVAILABLE and records a RECOVER transaction.',
         summary: [{ label: 'Asset', value: a.tag + ' — ' + a.name },
                   { label: 'New status', html: UI.badge(S.AVAILABLE) }],
-        confirmLabel: 'Mark recovered'
+        confirmLabel: fromMaintenance ? 'Return to service' : 'Mark recovered'
       }).then(function (ok) {
         if (!ok) { return; }
-        return API.transactions.recover(a.assetId, 'Recovered and returned to stock.')
-          .then(done('Asset recovered', a.tag + ' is available again.'));
+        return API.transactions.recover(a.assetId,
+          fromMaintenance ? 'Returned to service after maintenance.' : 'Recovered and returned to stock.')
+          .then(done(fromMaintenance ? 'Asset returned to service' : 'Asset recovered',
+                     a.tag + ' is available again.'));
       }).catch(fail);
     }
 

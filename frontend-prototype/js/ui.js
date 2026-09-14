@@ -48,7 +48,6 @@
     {
       label: 'Service & Analysis',
       items: [
-        { id: 'maintenance', href: 'maintenance.html', icon: '⚙', text: 'Maintenance', cap: 'maintenance.view' },
         { id: 'reports',     href: 'reports.html',     icon: '◠', text: 'Reports',     cap: 'report.view.basic' }
       ]
     },
@@ -411,16 +410,10 @@
         + '<p class="prototype-note">Prototype session. Production sign-in is delegated to Microsoft '
         + 'Entra ID (OpenID Connect) and role claims are issued by the identity provider.</p>',
       buttons: [
-        { label: 'Reset demo data', value: 'reset' },
         { label: 'Sign out', value: 'signout', variant: 'danger' }
       ]
     }).then(function (action) {
       if (action === 'signout') { Auth.signOut(); }
-      if (action === 'reset') {
-        global.Store.reset();
-        toast('Demo data reset', 'All sample records were restored to their original values.', 'success');
-        global.setTimeout(function () { global.location.reload(); }, 700);
-      }
     });
   }
 
@@ -503,6 +496,21 @@
   /* ------------------------------------------------------------- exports */
 
   global.Auth = Auth;
+  /* ================================================================ EXPORT */
+
+  /** Saves text as a file the browser downloads. */
+  function downloadCsv(filename, text) {
+    var blob = new global.Blob([text], { type: 'text/csv;charset=utf-8' });
+    var url = global.URL.createObjectURL(blob);
+    var link = global.document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    global.document.body.appendChild(link);
+    link.click();
+    global.document.body.removeChild(link);
+    global.URL.revokeObjectURL(url);
+  }
+
   global.UI = {
     esc: esc, qs: qs, qsa: qsa, param: param, initials: initials, titleCase: titleCase,
     fmtDate: fmtDate, fmtDateTime: fmtDateTime, fmtRelative: fmtRelative,
@@ -512,6 +520,7 @@
     clearErrors: clearErrors, setFieldError: setFieldError, showFormError: showFormError,
     handleApiError: handleApiError,
     emptyState: emptyState, loading: loading, selectOptions: selectOptions, bar: bar, denied: denied,
+    downloadCsv: downloadCsv,
     NAV: NAV
   };
 })(window);

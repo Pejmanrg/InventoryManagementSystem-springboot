@@ -8,8 +8,7 @@
   var REPORTS = [
     { id: 'site',        label: 'Assets by site',     method: 'assetsBySite',    cap: 'report.view.basic' },
     { id: 'employee',    label: 'Assets by employee', method: 'assetsByEmployee', cap: 'report.view.all' },
-    { id: 'lowstock',    label: 'Low stock',          method: 'lowStock',        cap: 'report.view.basic' },
-    { id: 'maintenance', label: 'Maintenance due',    method: 'maintenanceDue',  cap: 'report.view.basic' }
+    { id: 'lowstock',    label: 'Low stock',          method: 'lowStock',        cap: 'report.view.basic' }
   ].filter(function (r) { return Auth.can(r.cap); });
 
   var active = REPORTS[0];
@@ -38,8 +37,8 @@
            'Checked out ÷ total assets', ''),
       tile('Items below reorder', UI.fmtNumber(s.lowStock + s.outOfStock), 'Across all locations',
            (s.lowStock + s.outOfStock) ? 'warn' : 'ok'),
-      tile('Open work orders', UI.fmtNumber(s.openWorkOrders), s.overdueWorkOrders + ' overdue',
-           s.overdueWorkOrders ? 'danger' : 'ok')
+      tile('In maintenance', UI.fmtNumber(s.maintenance), 'Out of service for repair',
+           s.maintenance ? 'warn' : 'ok')
     ].join('');
   });
 
@@ -69,7 +68,7 @@
     UI.qs('#reportHost').innerHTML = UI.loading('Running ' + active.label.toLowerCase() + '…');
     API.reports[active.method]().then(function (rows) {
       currentRows = rows;
-      var render = { site: renderSite, employee: renderEmployee, lowstock: renderLowStock, maintenance: renderMaintenance };
+      var render = { site: renderSite, employee: renderEmployee, lowstock: renderLowStock };
       UI.qs('#reportHost').innerHTML = render[active.id](rows);
     }).catch(function (err) {
       UI.qs('#reportHost').innerHTML = '<div class="card__body"><div class="alert alert--danger">'
@@ -152,26 +151,17 @@
       + '</tbody></table></div>';
   }
 
-  function renderMaintenance(rows) {
-    if (!rows.length) { return UI.emptyState('Nothing scheduled', 'There are no open work orders.'); }
-    return '<div class="table-wrap"><table class="data responsive"><thead><tr>'
-      + '<th scope="col">Work order</th><th scope="col">Asset</th><th scope="col">Title</th>'
-      + '<th scope="col">Priority</th><th scope="col">Status</th><th scope="col">Due</th><th scope="col">Vendor</th>'
-      + '</tr></thead><tbody>'
-      + rows.map(function (w) {
-          return '<tr>'
-            + '<td data-label="Work order"><span class="cell-strong">' + UI.esc(w.number) + '</span></td>'
-            + '<td data-label="Asset">' + UI.esc(w.assetTag) + '</td>'
-            + '<td class="wrap" data-label="Title">' + UI.esc(w.title) + '</td>'
-            + '<td data-label="Priority">' + UI.priority(w.priority) + '</td>'
-            + '<td data-label="Status">' + UI.badge(w.status) + '</td>'
-            + '<td data-label="Due">' + (w.overdue
-                ? '<span class="badge badge--critical">Overdue</span> '
-                : '') + UI.esc(w.dueDate ? UI.fmtDate(w.dueDate) : '—') + '</td>'
-            + '<td data-label="Vendor">' + UI.esc(w.vendor) + '</td>'
-            + '</tr>';
-        }).join('')
-      + '</tbody></table></div>';
+  /** Turns the rows of whichever report is open into CSV. */
+  function toCsv(rows) {
+    if (!rows.length) { return ''; }
+    var columns = Object.keys(rows[0]).filter(function (k) { return !Array.isArray(rows[0][k]); });
+    var lines = [columns.join(',')];
+    rows.forEach(function (r) {
+      lines.push(columns.map(function (c) {
+        return '"' + String(r[c] === null || r[c] === undefined ? '' : r[c]).replace(/"/g, '""') + '"';
+      }).join(','));
+    });
+    return lines.join('\n');
   }
 
   var exportBtn = UI.qs('#exportBtn');
@@ -188,8 +178,8 @@
         confirmLabel: 'Export'
       }).then(function (ok) {
         if (ok) {
-          UI.toast('Export queued', active.label + ' — ' + currentRows.length
-            + ' rows. File delivery is mocked in this prototype.', 'success');
+          UI.downloadCsv(active.id + '-report.csv', toCsv(currentRows));
+          UI.toast('Export downloaded', active.label + ' — ' + currentRows.length + ' rows.', 'success');
         }
       });
     });

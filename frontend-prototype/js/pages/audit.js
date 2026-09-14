@@ -179,8 +179,8 @@
       }).then(function (ok) {
         if (!ok) { return; }
         return API.audit.exportCsv(rows).then(function (csv) {
-          UI.toast('Export prepared', rows.length + ' rows, ' + csv.split('\n').length
-            + ' lines. File delivery is mocked in this prototype.', 'success');
+          UI.downloadCsv('audit-history.csv', csv);
+          UI.toast('Export downloaded', rows.length + ' rows saved as audit-history.csv.', 'success');
         });
       });
     });

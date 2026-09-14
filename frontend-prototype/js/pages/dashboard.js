@@ -34,23 +34,19 @@
     API.reports.summary(),
     API.transactions.recent(8),
     API.reports.lowStock(),
-    API.reports.maintenanceDue(),
     API.assets.list({ custodianEmployeeId: user.employeeId })
   ]).then(function (results) {
-    var s = results[0], recent = results[1], low = results[2], due = results[3], mine = results[4];
+    var s = results[0], recent = results[1], low = results[2], mine = results[3];
 
     var tiles = [
       tile('Total assets', UI.fmtNumber(s.assetTotal), s.available + ' available · ' + s.checkedOut + ' checked out', 'accent'),
       tile('Checked out', UI.fmtNumber(s.checkedOut), 'Currently assigned to employees', ''),
-      tile('In maintenance', UI.fmtNumber(s.maintenance), s.openWorkOrders + ' open work orders', s.maintenance ? 'warn' : 'ok'),
+      tile('In maintenance', UI.fmtNumber(s.maintenance), 'Out of service for repair', s.maintenance ? 'warn' : 'ok'),
       tile('Low / out of stock', UI.fmtNumber(s.lowStock + s.outOfStock),
            s.outOfStock + ' SKUs at zero on hand', (s.lowStock + s.outOfStock) ? 'danger' : 'ok')
     ];
     if (Auth.can('report.view.all')) {
       tiles.push(tile('Inventory value', UI.fmtMoneyShort(s.inventoryValue), s.inventorySkus + ' tracked SKUs', ''));
-    }
-    if (Auth.can('purchasing.view')) {
-      tiles.push(tile('Open purchase orders', UI.fmtNumber(s.openPos), 'Synced from accounting / ERP', ''));
     }
     if (s.lost) {
       tiles.push(tile('Reported lost', UI.fmtNumber(s.lost), 'Awaiting recovery or write-off', 'danger'));
@@ -110,20 +106,6 @@
           }).join('') + '</ul>'
         : UI.emptyState('Stock levels are healthy', 'No SKU is below its reorder point.'),
       '<a class="btn btn--sm" href="inventory.html?stockState=LOW">Review inventory</a>',
-      true));
-
-    side.push(card('Maintenance due (' + due.length + ')',
-      due.length
-        ? '<ul class="timeline">' + due.slice(0, 5).map(function (w) {
-            return '<li><span class="timeline__body"><strong>' + UI.esc(w.number) + '</strong> '
-              + UI.priority(w.priority)
-              + '<div class="xsmall subtle">' + UI.esc(w.assetTag) + ' — ' + UI.esc(w.title) + '</div></span>'
-              + '<span class="timeline__when">' + (w.overdue
-                  ? '<span class="badge badge--critical">Overdue</span>'
-                  : UI.esc(UI.fmtDate(w.dueDate))) + '</span></li>';
-          }).join('') + '</ul>'
-        : UI.emptyState('Nothing scheduled', 'No open maintenance work orders.'),
-      '<a class="btn btn--sm" href="maintenance.html">Open maintenance</a>',
       true));
 
     UI.qs('#colSide').innerHTML = side.join('');

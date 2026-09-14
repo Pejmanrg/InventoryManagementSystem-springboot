@@ -36,10 +36,6 @@
     +     '<section class="card"><div class="card__head"><h2>Lookup values</h2></div>'
     +       '<div class="card__body" id="lookupHost">' + UI.loading('Loading…') + '</div></section>'
     +   '</div>'
-    +   '<section class="card"><div class="card__head"><h2>External integrations</h2>'
-    +     '<div class="spacer"></div>'
-    +     '<span class="small muted">CSC-13 External Integration Gateway</span></div>'
-    +     '<div id="integrationHost">' + UI.loading('Loading…') + '</div></section>'
     + '</div>';
 
   var newUserBtn = UI.qs('#newUser');
@@ -48,7 +44,6 @@
   renderRoles();
   loadUsers();
   loadLookups();
-  loadIntegrations();
 
   function loadUsers() {
     API.admin.users().then(function (users) {
@@ -276,27 +271,4 @@
       + '</div></div>';
   }
 
-  function loadIntegrations() {
-    API.admin.integrations().then(function (list) {
-      UI.qs('#integrationHost').innerHTML = '<div class="table-wrap"><table class="data responsive"><thead><tr>'
-        + '<th scope="col">System</th><th scope="col">Direction</th><th scope="col">Purpose</th>'
-        + '<th scope="col">Owner</th><th scope="col">Status</th><th scope="col">Last sync</th>'
-        + '</tr></thead><tbody>'
-        + list.map(function (i) {
-            return '<tr>'
-              + '<td data-label="System"><span class="cell-strong">' + UI.esc(i.name) + '</span></td>'
-              + '<td data-label="Direction">' + UI.esc(i.direction) + '</td>'
-              + '<td class="wrap" data-label="Purpose">' + UI.esc(i.purpose) + '</td>'
-              + '<td data-label="Owner">' + UI.esc(i.owner) + '</td>'
-              + '<td data-label="Status">' + (i.status === 'CONNECTED'
-                  ? '<span class="badge badge--ok">Connected</span>'
-                  : '<span class="badge badge--neutral">Not configured</span>') + '</td>'
-              + '<td data-label="Last sync">' + UI.esc(i.lastSync ? UI.fmtDateTime(i.lastSync) : '—') + '</td>'
-              + '</tr>';
-          }).join('')
-        + '</tbody></table></div>'
-        + '<div class="card__foot"><span class="small muted">External systems never reach the database directly. '
-        + 'All exchange happens through versioned APIs behind the integration gateway.</span></div>';
-    });
-  }
 })();

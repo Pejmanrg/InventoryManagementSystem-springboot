@@ -16,8 +16,6 @@
   }
   ApiError.prototype = Object.create(Error.prototype);
 
-  function db() { return global.Store.load(); }
-  function commit() { global.Store.persist(); }
   function nowIso() { return new Date().toISOString().slice(0, 19); }
   function clone(v) { return global.Store.clone(v); }
 
@@ -299,15 +297,11 @@
         condition: options.condition || null,
         notes: options.notes || 'Returned'
       }).then(function (result) {
-        if (!options.sendToMaintenance) {
-          result.workOrder = null;
-          return result;
-        }
+        // A return flagged "needs service" is a second lifecycle call, so the
+        // asset lands in MAINTENANCE instead of AVAILABLE.
+        if (!options.sendToMaintenance) { return result; }
         return lifecycle(assetId, 'maintenance', {
-          notes: options.maintenanceTitle || 'Service required after check-in'
-        }).then(function (afterMaintenance) {
-          afterMaintenance.workOrder = null; // work orders are Phase 2
-          return afterMaintenance;
+          notes: options.notes || 'Service required after check-in'
         });
       });
     },
@@ -477,122 +471,8 @@
     }
   };
 
-  /* ========================================================== MAINTENANCE */
-  /* MOCK - no MaintenanceController, WorkOrder entity or table exists yet.
-     These read and write the in-browser Store exactly as the prototype did.
-     Delete this block and point at /api/work-orders once Phase 2 lands. */
 
-  function createWorkOrderInternal(dto) {
-    var s = db();
-    var year = new Date().getFullYear();
-    var seqNo = 143 + s.workOrders.filter(function (w) { return w.number.indexOf('WO-' + year) === 0; }).length;
-    var wo = {
-      workOrderId: global.Store.nextId('wo'),
-      number: 'WO-' + year + '-' + String(seqNo).padStart(4, '0'),
-      assetId: dto.assetId || null,
-      title: dto.title,
-      type: dto.type || 'CORRECTIVE',
-      priority: dto.priority || 'MEDIUM',
-      status: 'OPEN',
-      assignedTo: dto.assignedTo || null,
-      vendor: dto.vendor || 'In-house',
-      openedAt: nowIso(),
-      dueDate: dto.dueDate || '',
-      closedAt: null,
-      estimatedCost: dto.estimatedCost ? Number(dto.estimatedCost) : 0,
-      notes: dto.notes || ''
-    };
-    s.workOrders.unshift(wo);
-    commit();
-    return clone(wo);
-  }
-
-  function decorateWorkOrder(w) {
-    var emp = w.assignedTo ? byId(global.MockData.EMPLOYEES, 'employeeId', w.assignedTo) : null;
-    var out = clone(w);
-    out.assetTag = '-';
-    out.assetName = w.assetId ? 'Asset ' + w.assetId : 'Not asset-specific';
-    out.assignedToName = emp ? emp.name : 'Unassigned';
-    out.overdue = !!(w.dueDate && w.status !== 'CLOSED' && w.dueDate < nowIso().slice(0, 10));
-    return out;
-  }
-
-  function mockRespond(producer) {
-    return new Promise(function (resolve, reject) {
-      global.setTimeout(function () {
-        try { resolve(producer()); } catch (err) { reject(err); }
-      }, 120);
-    });
-  }
-
-  var maintenance = {
-    /** MOCK */
-    list: function (params) {
-      params = params || {};
-      return mockRespond(function () {
-        var q = String(params.query || '').trim().toLowerCase();
-        return db().workOrders.map(decorateWorkOrder).filter(function (w) {
-          if (params.status && w.status !== params.status) { return false; }
-          if (params.priority && w.priority !== params.priority) { return false; }
-          if (params.type && w.type !== params.type) { return false; }
-          if (!q) { return true; }
-          return contains(w.number, q) || contains(w.title, q);
-        });
-      });
-    },
-
-    /** MOCK */
-    create: function (dto) {
-      return mockRespond(function () {
-        if (!dto.title || !String(dto.title).trim()) {
-          throw new ApiError(400, 'A work order title is required.', 'title');
-        }
-        var wo = createWorkOrderInternal(dto);
-        return decorateWorkOrder(byId(db().workOrders, 'workOrderId', wo.workOrderId));
-      }).then(function (wo) {
-        /* If the work order takes the asset out of service, that transition IS
-           backed by the API, so it is applied for real. */
-        if (dto.assetId && dto.takeOutOfService) {
-          return lifecycle(dto.assetId, 'maintenance', { notes: dto.title })
-            .then(function () { return wo; })
-            .catch(function () { return wo; });
-        }
-        return wo;
-      });
-    },
-
-    /** MOCK */
-    update: function (workOrderId, dto) {
-      return mockRespond(function () {
-        var w = byId(db().workOrders, 'workOrderId', workOrderId);
-        if (!w) { throw new ApiError(404, 'Work order not found: ' + workOrderId); }
-        ['title', 'priority', 'status', 'assignedTo', 'vendor', 'dueDate', 'notes'].forEach(function (k) {
-          if (dto[k] !== undefined && dto[k] !== '') { w[k] = dto[k]; }
-        });
-        commit();
-        return decorateWorkOrder(w);
-      });
-    },
-
-    /** MOCK */
-    close: function (workOrderId, options) {
-      options = options || {};
-      return mockRespond(function () {
-        var s = db();
-        var w = byId(s.workOrders, 'workOrderId', workOrderId);
-        if (!w) { throw new ApiError(404, 'Work order not found: ' + workOrderId); }
-        if (w.status === 'CLOSED') { throw new ApiError(409, w.number + ' is already closed.'); }
-        w.status = 'CLOSED';
-        w.closedAt = nowIso();
-        if (options.notes) { w.notes = options.notes; }
-        commit();
-        return decorateWorkOrder(w);
-      });
-    }
-  };
-
-  /* ============================================================== REPORTS */
-  /* Computed from LIVE data, except maintenanceDue which needs work orders. */
+  /* Every figure below is computed from live API data. */
 
   var reports = {
     /** Aggregated from GET /api/assets + GET /api/locations. */
@@ -647,19 +527,10 @@
       });
     },
 
-    /** MOCK - work orders are Phase 2. */
-    maintenanceDue: function () {
-      return maintenance.list({}).then(function (rows) {
-        return rows.filter(function (w) { return w.status !== 'CLOSED'; })
-          .sort(function (x, y) { return String(x.dueDate).localeCompare(String(y.dueDate)); });
-      });
-    },
-
-    /** Dashboard tiles. Asset and inventory figures are live; work-order and
-        purchase-order figures still come from the Store. */
+    /** Dashboard and report tiles. */
     summary: function () {
       return Promise.all([assets.list({}), inventory.list({})]).then(function (r) {
-        var rows = r[0], items = r[1], s = db();
+        var rows = r[0], items = r[1];
         function count(st) { return rows.filter(function (a) { return a.status === st; }).length; }
         return {
           assetTotal: rows.length,
@@ -673,10 +544,7 @@
           outOfStock: items.filter(function (i) { return i.stockState === 'CRITICAL'; }).length,
           inventoryValue: Number(items.reduce(function (sum, i) {
             return sum + (Number(i.extendedValue) || 0);
-          }, 0).toFixed(2)),
-          openWorkOrders: s.workOrders.filter(function (w) { return w.status !== 'CLOSED'; }).length,
-          overdueWorkOrders: s.workOrders.map(decorateWorkOrder).filter(function (w) { return w.overdue; }).length,
-          openPos: s.purchaseOrders.filter(function (p) { return p.status !== 'RECEIVED'; }).length
+          }, 0).toFixed(2))
         };
       });
     }
@@ -684,8 +552,7 @@
 
   /* ================================================================ ADMIN */
   /* Users are LIVE - UserController /api/users, ADMIN only except /me.
-     lookups.locations is LIVE. Integrations and purchase orders remain MOCK:
-     no backend table exists for either in Phase 1. */
+     lookups.locations is LIVE; the remaining lists are fixed code values. */
 
   /**
    * Adds the fields the screens display.
@@ -798,12 +665,7 @@
       });
     },
 
-    /** MOCK */
-    integrations: function () {
-      return mockRespond(function () { return clone(db().integrations); });
-    },
-
-    /** Locations are LIVE; the other lists have no backend table yet. */
+    /** Locations are LIVE; the other lists are fixed code values. */
     lookups: function () {
       return locations().then(function (locs) {
         return {
@@ -813,11 +675,6 @@
           adjustmentReasons: clone(global.MockData.ADJUSTMENT_REASONS)
         };
       });
-    },
-
-    /** MOCK */
-    purchaseOrders: function () {
-      return mockRespond(function () { return clone(db().purchaseOrders); });
     },
 
     /** LIVE - GET /api/employees, used by the checkout screen. */
@@ -903,7 +760,6 @@
     assets: assets,
     transactions: transactions,
     inventory: inventory,
-    maintenance: maintenance,
     reports: reports,
     admin: admin,
     audit: auditApi,
